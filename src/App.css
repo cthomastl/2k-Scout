@@ -459,6 +459,46 @@ body {
   color: #64748b;
 }
 
+/* ── AI Game Plan ── */
+.ai-plan-btn {
+  margin-top: 16px;
+}
+
+.ai-plan-regen {
+  background: #1e40af;
+  font-size: 12px;
+  padding: 7px 14px;
+  margin-top: 12px;
+}
+
+.ai-plan-regen:hover {
+  background: #1e3a8a;
+}
+
+.game-plan {
+  margin-top: 20px;
+  background: #0f172a;
+  border: 1px solid #1e3a8a;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.game-plan-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #60a5fa;
+  margin-bottom: 10px;
+}
+
+.game-plan-text {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #cbd5e1;
+  white-space: pre-wrap;
+}
+
 /* ── Loading / error ── */
 .loading {
   text-align: center;

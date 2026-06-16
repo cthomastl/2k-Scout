@@ -3,6 +3,7 @@ import './App.css'
 
 const API_KEY = 'YOUR_KEY_HERE'
 const BASE_URL = 'https://api.nba2kapi.com'
+const LAMBDA_URL = 'YOUR_LAMBDA_URL_HERE'
 
 async function apiFetch(path) {
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -258,6 +259,9 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
   const [loading, setLoading] = useState(false)
   const [fetched, setFetched] = useState(false)
   const [error, setError] = useState(null)
+  const [gamePlan, setGamePlan] = useState(null)
+  const [planLoading, setPlanLoading] = useState(false)
+  const [planError, setPlanError] = useState(null)
 
   const fetchAllDetails = useCallback(async () => {
     setLoading(true)
@@ -334,6 +338,34 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
   const myAdvantages = Object.entries(myBadges).filter(([name]) => !oppBadges[name])
   const oppAdvantages = Object.entries(oppBadges).filter(([name]) => !myBadges[name])
 
+  async function getAIGamePlan() {
+    setPlanLoading(true)
+    setPlanError(null)
+    setGamePlan(null)
+    try {
+      const res = await fetch(LAMBDA_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          myTeam,
+          opponentTeam,
+          attackTargets,
+          hideTargets,
+          myAdvantages,
+          oppAdvantages,
+        }),
+      })
+      if (!res.ok) throw new Error(`Lambda error ${res.status}`)
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setGamePlan(data.gamePlan)
+    } catch (e) {
+      setPlanError(e.message)
+    } finally {
+      setPlanLoading(false)
+    }
+  }
+
   return (
     <div className="matchup-analyzer">
       <h2 className="analyzer-title">Matchup Analyzer</h2>
@@ -349,6 +381,25 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
 
       {loading && <div className="loading">Fetching full rosters for analysis…</div>}
       {error && <div className="api-error">Error: {error}</div>}
+
+      {fetched && !planLoading && !gamePlan && (
+        <button className="analyze-btn ai-plan-btn" onClick={getAIGamePlan}>
+          Get AI Game Plan
+        </button>
+      )}
+
+      {planLoading && <div className="loading">Generating game plan…</div>}
+      {planError && <div className="api-error">AI error: {planError}</div>}
+
+      {gamePlan && (
+        <div className="game-plan">
+          <div className="game-plan-title">AI Game Plan</div>
+          <p className="game-plan-text">{gamePlan}</p>
+          <button className="analyze-btn ai-plan-btn ai-plan-regen" onClick={getAIGamePlan}>
+            Regenerate
+          </button>
+        </div>
+      )}
 
       {fetched && (
         <div className="analysis-grid">

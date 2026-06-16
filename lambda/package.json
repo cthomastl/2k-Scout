@@ -1,0 +1,10 @@
+{
+  "name": "2k-scout-lambda",
+  "version": "1.0.0",
+  "description": "Lambda function to generate AI game plans via Claude",
+  "type": "module",
+  "main": "index.mjs",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0"
+  }
+}
