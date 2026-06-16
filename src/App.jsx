@@ -135,6 +135,20 @@ function PlayerCard({ player, teamName }) {
     try {
       const data = await apiFetch(`/api/players/slug/${slug}?teamType=allt&team=${encodeURIComponent(teamName)}`)
       console.log(`Player detail for ${player.name}:`, JSON.stringify(data, null, 2))
+
+      // If badges not in the main response, try the dedicated badges endpoint
+      if (data.badges === undefined) {
+        try {
+          const badgeData = await apiFetch(`/api/players/slug/${slug}/badges?teamType=allt&team=${encodeURIComponent(teamName)}`)
+          console.log(`Badges for ${player.name}:`, JSON.stringify(badgeData, null, 2))
+          data.badges = Array.isArray(badgeData)
+            ? badgeData
+            : badgeData.badges || badgeData.data || []
+        } catch {
+          // leave badges undefined — BadgeList will show "unavailable"
+        }
+      }
+
       setDetail(data)
     } catch (e) {
       setError(e.message)
@@ -273,6 +287,16 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
           const slug = player.slug || player.player_slug || player.name?.toLowerCase().replace(/\s+/g, '-')
           try {
             const data = await apiFetch(`/api/players/slug/${slug}?teamType=allt&team=${encodeURIComponent(teamName)}`)
+            if (data.badges === undefined) {
+              try {
+                const badgeData = await apiFetch(`/api/players/slug/${slug}/badges?teamType=allt&team=${encodeURIComponent(teamName)}`)
+                data.badges = Array.isArray(badgeData)
+                  ? badgeData
+                  : badgeData.badges || badgeData.data || []
+              } catch {
+                // leave badges undefined
+              }
+            }
             results[slug] = data
           } catch {
             // skip failed players
