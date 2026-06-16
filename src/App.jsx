@@ -61,16 +61,16 @@ function StatGroup({ title, stats, playerData }) {
 }
 
 const OFFENSE_STATS = [
-  { label: 'Close Shot', key: 'close_shot' },
-  { label: 'Mid Range', key: 'mid_range_shot' },
-  { label: 'Three Point', key: 'three_point_shot' },
-  { label: 'Ball Handle', key: 'ball_handle' },
-  { label: 'Passing', key: 'pass_accuracy' },
+  { label: 'Close Shot', key: 'closeShot' },
+  { label: 'Mid Range', key: 'midRangeShot' },
+  { label: 'Three Point', key: 'threePointShot' },
+  { label: 'Ball Handle', key: 'ballHandle' },
+  { label: 'Passing', key: 'passAccuracy' },
 ]
 
 const DEFENSE_STATS = [
-  { label: 'Perimeter Def', key: 'perimeter_defense' },
-  { label: 'Interior Def', key: 'interior_defense' },
+  { label: 'Perimeter Def', key: 'perimeterDefense' },
+  { label: 'Interior Def', key: 'interiorDefense' },
   { label: 'Steal', key: 'steal' },
   { label: 'Block', key: 'block' },
 ]
@@ -121,7 +121,7 @@ function PlayerCard({ player, teamName }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const slug = player.slug || player.player_slug || player.name?.toLowerCase().replace(/\s+/g, '-')
+  const slug = player.slug || player.name?.toLowerCase().replace(/\s+/g, '-')
 
   async function handleExpand() {
     if (expanded) {
@@ -136,19 +136,6 @@ function PlayerCard({ player, teamName }) {
       const data = await apiFetch(`/api/players/slug/${slug}?teamType=allt&team=${encodeURIComponent(teamName)}`)
       console.log(`Player detail for ${player.name}:`, JSON.stringify(data, null, 2))
 
-      // If badges not in the main response, try the dedicated badges endpoint
-      if (data.badges === undefined) {
-        try {
-          const badgeData = await apiFetch(`/api/players/slug/${slug}/badges?teamType=allt&team=${encodeURIComponent(teamName)}`)
-          console.log(`Badges for ${player.name}:`, JSON.stringify(badgeData, null, 2))
-          data.badges = Array.isArray(badgeData)
-            ? badgeData
-            : badgeData.badges || badgeData.data || []
-        } catch {
-          // leave badges undefined — BadgeList will show "unavailable"
-        }
-      }
-
       setDetail(data)
     } catch (e) {
       setError(e.message)
@@ -157,14 +144,14 @@ function PlayerCard({ player, teamName }) {
     }
   }
 
-  const overall = player.overall ?? player.overall_rating ?? detail?.overall ?? detail?.overall_rating
+  const overall = player.overall ?? detail?.overall
 
   return (
     <div className={`player-card ${expanded ? 'expanded' : ''}`}>
       <button className="player-card-header" onClick={handleExpand} aria-expanded={expanded}>
-        <span className="player-name">{player.name || player.player_name}</span>
+        <span className="player-name">{player.name}</span>
         <span className="player-meta">
-          {player.position && <span className="player-pos">{player.position}</span>}
+          {player.positions && <span className="player-pos">{Array.isArray(player.positions) ? player.positions[0] : player.positions}</span>}
           {overall && (
             <span className="player-overall" style={{ color: getRatingColor(overall) }}>
               {overall}
@@ -180,21 +167,21 @@ function PlayerCard({ player, teamName }) {
           {error && <div className="api-error">Error: {error}</div>}
           {detail && !loading && (
             <div className="player-detail">
-              {(detail.headshot || detail.image || detail.photo) && (
+              {detail.playerImage && (
                 <img
                   className="player-headshot"
-                  src={detail.headshot || detail.image || detail.photo}
+                  src={detail.playerImage}
                   alt={detail.name}
                   onError={e => { e.target.style.display = 'none' }}
                 />
               )}
               <div className="player-header-info">
-                <div className="player-detail-name">{detail.name || detail.player_name}</div>
+                <div className="player-detail-name">{detail.name}</div>
                 <div className="player-detail-meta">
-                  {detail.position && <span>{detail.position}</span>}
-                  {(detail.overall ?? detail.overall_rating) && (
-                    <span style={{ color: getRatingColor(detail.overall ?? detail.overall_rating) }}>
-                      OVR {detail.overall ?? detail.overall_rating}
+                  {detail.positions && <span>{Array.isArray(detail.positions) ? detail.positions.join(' / ') : detail.positions}</span>}
+                  {detail.overall && (
+                    <span style={{ color: getRatingColor(detail.overall) }}>
+                      OVR {detail.overall}
                     </span>
                   )}
                 </div>
@@ -232,8 +219,8 @@ function TeamPanel({ side, selectedTeam, onTeamChange, teams, roster, loading, e
         >
           <option value="">— Select Team —</option>
           {teams.map(t => (
-            <option key={t.name || t.team_name || t} value={t.name || t.team_name || t}>
-              {t.name || t.team_name || t}
+            <option key={t.teamName} value={t.teamName}>
+              {t.teamName}
             </option>
           ))}
         </select>
@@ -246,7 +233,7 @@ function TeamPanel({ side, selectedTeam, onTeamChange, teams, roster, loading, e
         <div className="roster-list">
           {roster.map((player, i) => (
             <PlayerCard
-              key={player.slug || player.player_slug || player.name || i}
+              key={player.slug || player.name || i}
               player={player}
               teamName={selectedTeam}
             />
@@ -284,19 +271,9 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
       const fetchRoster = async (roster, teamName) => {
         const results = {}
         for (const player of roster) {
-          const slug = player.slug || player.player_slug || player.name?.toLowerCase().replace(/\s+/g, '-')
+          const slug = player.slug || player.name?.toLowerCase().replace(/\s+/g, '-')
           try {
             const data = await apiFetch(`/api/players/slug/${slug}?teamType=allt&team=${encodeURIComponent(teamName)}`)
-            if (data.badges === undefined) {
-              try {
-                const badgeData = await apiFetch(`/api/players/slug/${slug}/badges?teamType=allt&team=${encodeURIComponent(teamName)}`)
-                data.badges = Array.isArray(badgeData)
-                  ? badgeData
-                  : badgeData.badges || badgeData.data || []
-              } catch {
-                // leave badges undefined
-              }
-            }
             results[slug] = data
           } catch {
             // skip failed players
@@ -323,11 +300,11 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
 
   const attackTargets = oppDetailsList.length
     ? [...oppDetailsList]
-        .filter(p => p.perimeter_defense !== undefined || p.interior_defense !== undefined)
+        .filter(p => p.perimeterDefense !== undefined || p.interiorDefense !== undefined)
         .map(p => ({
-          name: p.name || p.player_name,
-          perim: parseInt(p.perimeter_defense) || 99,
-          interior: parseInt(p.interior_defense) || 99,
+          name: p.name,
+          perim: parseInt(p.perimeterDefense) || 99,
+          interior: parseInt(p.interiorDefense) || 99,
         }))
         .sort((a, b) => (a.perim + a.interior) - (b.perim + b.interior))
         .slice(0, 3)
@@ -335,32 +312,14 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
 
   const hideTargets = myDetailsList.length
     ? [...myDetailsList]
-        .filter(p => p.perimeter_defense !== undefined)
-        .map(p => ({ name: p.name || p.player_name, perim: parseInt(p.perimeter_defense) || 99 }))
+        .filter(p => p.perimeterDefense !== undefined)
+        .map(p => ({ name: p.name, perim: parseInt(p.perimeterDefense) || 99 }))
         .sort((a, b) => a.perim - b.perim)
         .slice(0, 3)
     : []
 
-  const HOF_TIERS = ['hall of fame', 'hof', 'legend', 'gold']
-  function getHighBadges(detailsList) {
-    const result = {}
-    detailsList.forEach(p => {
-      if (!Array.isArray(p.badges)) return
-      p.badges.forEach(b => {
-        const tier = (b.tier || '').toLowerCase()
-        if (HOF_TIERS.some(t => tier.includes(t))) {
-          const name = b.name || b.badge_name || b.label
-          if (name) result[name] = { tier: b.tier, player: p.name || p.player_name }
-        }
-      })
-    })
-    return result
-  }
-
-  const myBadges = getHighBadges(myDetailsList)
-  const oppBadges = getHighBadges(oppDetailsList)
-  const myAdvantages = Object.entries(myBadges).filter(([name]) => !oppBadges[name])
-  const oppAdvantages = Object.entries(oppBadges).filter(([name]) => !myBadges[name])
+  const myAdvantages = []
+  const oppAdvantages = []
 
   async function getAIGamePlan() {
     setPlanLoading(true)
@@ -509,7 +468,7 @@ export default function App() {
     apiFetch('/api/teams?teamType=allt')
       .then(data => {
         console.log('Teams response:', JSON.stringify(data, null, 2))
-        const list = Array.isArray(data) ? data : data.teams || data.data || []
+        const list = Array.isArray(data) ? data : data.data || data.teams || []
         setTeams(list)
       })
       .catch(e => setTeamsError(e.message))
@@ -524,7 +483,7 @@ export default function App() {
     try {
       const data = await apiFetch(`/api/teams/${encodeURIComponent(teamName)}/roster?teamType=allt`)
       console.log(`Roster for ${teamName}:`, JSON.stringify(data, null, 2))
-      const roster = Array.isArray(data) ? data : data.roster || data.players || data.data || []
+      const roster = Array.isArray(data) ? data : data.data || data.roster || data.players || []
       setRoster(roster)
     } catch (e) {
       setError(e.message)
