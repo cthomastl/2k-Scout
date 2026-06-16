@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import './App.css'
 
-const API_KEY = 'YOUR_KEY_HERE'
+const API_KEY = '2k_e55epjrp3x2oqtkam4ukk4yklystt5cb'
 const BASE_URL = 'https://api.nba2kapi.com'
 const LAMBDA_URL = 'YOUR_LAMBDA_URL_HERE'
 
