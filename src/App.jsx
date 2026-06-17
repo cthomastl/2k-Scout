@@ -353,18 +353,21 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
       ),
     }))
 
-  const bestMatchups = [...opponentRoster]
-    .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
-    .slice(0, 5)
-    .map(threat => {
+  const bestMatchups = (() => {
+    const threats = [...opponentRoster]
+      .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
+      .slice(0, 5)
+    const usedDefenders = new Set()
+    return threats.map(threat => {
       const oppPos = threat.positions || []
       const big = oppPos.some(p => BIGS.includes(p))
       const defStat = big ? 'interiorDefense' : 'perimeterDefense'
       const statLabel = big ? 'Interior Defense' : 'Perimeter Defense'
 
-      const samePos = myRoster.filter(p => p.attributes && (p.positions || []).some(pos => oppPos.includes(pos)))
-      const pool = samePos.length > 0 ? samePos : myRoster.filter(p => p.attributes)
+      const samePos = myRoster.filter(p => p.attributes && !usedDefenders.has(p.name) && (p.positions || []).some(pos => oppPos.includes(pos)))
+      const pool = samePos.length > 0 ? samePos : myRoster.filter(p => p.attributes && !usedDefenders.has(p.name))
       const defender = [...pool].sort((a, b) => (b.attributes[defStat] ?? 0) - (a.attributes[defStat] ?? 0))[0]
+      if (defender) usedDefenders.add(defender.name)
 
       return defender ? {
         threat: threat.name,
@@ -375,8 +378,8 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
         defValue: defender.attributes[defStat] ?? '—',
         statLabel,
       } : null
-    })
-    .filter(Boolean)
+    }).filter(Boolean)
+  })()
 
   async function getAIGamePlan() {
     setPlanLoading(true)
