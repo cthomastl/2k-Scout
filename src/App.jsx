@@ -3,7 +3,7 @@ import './App.css'
 
 const API_KEY = import.meta.env.VITE_NBA2K_API_KEY ?? ''
 const BASE_URL = ''
-const LAMBDA_URL = 'YOUR_LAMBDA_URL_HERE'
+const LAMBDA_URL = import.meta.env.VITE_LAMBDA_URL ?? ''
 
 async function apiFetch(path) {
   const res = await fetch(`${BASE_URL}${path}`, {
