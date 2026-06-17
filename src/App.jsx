@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 
-const API_KEY = '2k_e55epjrp3x2oqtkam4ukk4yklystt5cb'
+const API_KEY = import.meta.env.VITE_NBA2K_API_KEY ?? ''
 const BASE_URL = ''
 const LAMBDA_URL = 'YOUR_LAMBDA_URL_HERE'
 
