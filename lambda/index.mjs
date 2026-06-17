@@ -9,39 +9,66 @@ const CORS_HEADERS = {
   'Content-Type': 'application/json',
 }
 
-function buildPrompt({ myTeam, opponentTeam, attackTargets, hideTargets, leaveOpen }) {
-  const attackLines = attackTargets.length
-    ? attackTargets.map(p => `  - ${p.name} (PD ${p.perim} / ID ${p.interior})`).join('\n')
-    : '  - No data available'
+function buildPrompt({ myTeam, opponentTeam, attackTargets, hideTargets, leaveOpen, speedAdvantage, bestMatchups, myKeyPlayers, oppKeyPlayers }) {
+  const fmt = lines => lines.length ? lines.join('\n') : '  - No data'
 
-  const hideLines = hideTargets.length
-    ? hideTargets.map(p => `  - ${p.name} (PD ${p.perim})`).join('\n')
-    : '  - No data available'
+  const attackLines = fmt(attackTargets.map(p =>
+    `  - ${p.name} [${(p.positions||[]).join('/')}] (Perimeter Defense ${p.perim} / Interior Defense ${p.interior})`
+  ))
+  const hideLines = fmt(hideTargets.map(p =>
+    `  - ${p.name} (Perimeter Defense ${p.perim})`
+  ))
+  const leaveLines = fmt(leaveOpen.map(p =>
+    `  - ${p.name} (Three-Point Shot ${p.three} / Mid-Range ${p.mid})`
+  ))
+  const speedLines = fmt((speedAdvantage||[]).map(m =>
+    `  - ${m.myPlayer} (Speed ${m.mySpeed}) vs ${m.oppPlayer} (Speed ${m.oppSpeed}) — advantage +${m.diff}`
+  ))
+  const matchupLines = fmt((bestMatchups||[]).map(m =>
+    `  - ${m.threat} [OVR ${m.threatOverall}, ${m.threatPos}${m.threatArchetype ? ', ' + m.threatArchetype : ''}] → guard with ${m.defender} (${m.statLabel} ${m.defValue})`
+  ))
+  const myRosterLines = fmt((myKeyPlayers||[]).map(p =>
+    `  - ${p.name} [OVR ${p.overall}, ${(p.positions||[]).join('/')}${p.archetype ? ', ' + p.archetype : ''}]`
+  ))
+  const oppRosterLines = fmt((oppKeyPlayers||[]).map(p =>
+    `  - ${p.name} [OVR ${p.overall}, ${(p.positions||[]).join('/')}${p.archetype ? ', ' + p.archetype : ''}]`
+  ))
 
-  const leaveLines = leaveOpen.length
-    ? leaveOpen.map(p => `  - ${p.name} (3PT ${p.three} / MID ${p.mid})`).join('\n')
-    : '  - No data available'
+  return `You are an elite NBA 2K strategist with deep knowledge of both 2K gameplay mechanics AND real NBA history. You are coaching a human player controlling ${myTeam} against ${opponentTeam}.
 
-  return `You are an expert NBA 2K coach giving pre-game instructions to a human player controlling ${myTeam} against ${opponentTeam}.
+You know who these players are in real life — their tendencies, signature moves, historical strengths and weaknesses. Blend that knowledge with the 2K attribute data to give sharp, realistic advice.
+
+MY TEAM — ${myTeam} (top players):
+${myRosterLines}
+
+OPPONENT — ${opponentTeam} (top players):
+${oppRosterLines}
 
 SCOUTING DATA:
 
-${opponentTeam} defensive weaknesses (low PD = easy to score on in isolation):
+Opponent's weakest defenders — ISO targets:
 ${attackLines}
 
-${myTeam} defensive liabilities (low PD = get beaten off the dribble, exploit by opponent):
+My weak perimeter defenders — need to be hidden:
 ${hideLines}
 
-${opponentTeam} poor shooters (low 3PT + mid = safe to leave open, sag off for help defense):
+Opponent's poor shooters — safe to leave open:
 ${leaveLines}
 
-IMPORTANT STRATEGY RULES — follow these exactly:
-- "Hide" means: pair each of MY weak defenders with one of THEIR poor shooters so MY weak defender can sag off and help on drives instead of being isolated. Name the specific pairing (e.g. "Guard [their poor shooter] with [my weak defender] so [my weak defender] can sag into the paint").
-- "Attack" means: run ISO plays or post-ups targeting the opponent's worst defenders. Name who to attack and what move to use (drive, post, mid pull-up).
-- Never suggest putting a weak offensive player in an isolation role.
-- Be tactical, specific, and concise. No generic advice.
+Speed mismatches in my favor:
+${speedLines}
 
-Write 3 short sections: Offensive Plan, Defensive Matchups, Key Adjustments. Under 300 words. Plain text only.`
+Recommended defensive assignments:
+${matchupLines}
+
+COACHING RULES:
+1. Use real basketball knowledge. If Kobe is on the opponent, note his footwork and mid-range game. If Shaq, note he cannot be posted against but slow on switches. Apply what you actually know about these players.
+2. For hide matchups: explicitly pair each of my weak defenders with one of their poor shooters so my guy can sag off and help. State the pairing by name (e.g. "Guard [their poor shooter] with [my weak defender] so he can sag into the paint").
+3. For attack targets: name the specific play — drive left, post up, pull-up mid — based on who the defender realistically is.
+4. For speed mismatches: suggest how to use them (push in transition, backdoor cuts, blow-bys on the wing).
+5. No generic advice. Every sentence should name a player and a specific action.
+
+Write 4 focused sections: Offensive Plan, Defensive Assignments, Speed and Transition, Key In-Game Adjustments. Under 450 words. Plain text only.`
 }
 
 export const handler = async (event) => {
@@ -56,18 +83,23 @@ export const handler = async (event) => {
     return { statusCode: 400, headers: CORS_HEADERS, body: JSON.stringify({ error: 'Invalid JSON body' }) }
   }
 
-  const { myTeam, opponentTeam, attackTargets = [], hideTargets = [], leaveOpen = [] } = body
+  const {
+    myTeam, opponentTeam,
+    attackTargets = [], hideTargets = [], leaveOpen = [],
+    speedAdvantage = [], bestMatchups = [],
+    myKeyPlayers = [], oppKeyPlayers = [],
+  } = body
 
   if (!myTeam || !opponentTeam) {
     return { statusCode: 400, headers: CORS_HEADERS, body: JSON.stringify({ error: 'myTeam and opponentTeam are required' }) }
   }
 
   try {
-    const prompt = buildPrompt({ myTeam, opponentTeam, attackTargets, hideTargets, leaveOpen })
+    const prompt = buildPrompt({ myTeam, opponentTeam, attackTargets, hideTargets, leaveOpen, speedAdvantage, bestMatchups, myKeyPlayers, oppKeyPlayers })
 
     const message = await client.messages.create({
       model: 'claude-opus-4-8',
-      max_tokens: 1024,
+      max_tokens: 1500,
       thinking: { type: 'adaptive' },
       messages: [{ role: 'user', content: prompt }],
     })

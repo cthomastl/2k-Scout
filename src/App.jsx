@@ -273,15 +273,17 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
   const [planLoading, setPlanLoading] = useState(false)
   const [planError, setPlanError] = useState(null)
 
-  // Roster already contains attributes + badges — no second fetch needed
-
   const PERIMETER = ['PG', 'SG', 'SF']
+  const BIGS = ['C', 'PF']
   const isPerimeter = p => (p.positions || []).some(pos => PERIMETER.includes(pos))
+  const isBig = p => (p.positions || []).some(pos => BIGS.includes(pos))
 
   const attackTargets = [...opponentRoster]
     .filter(p => p.attributes)
     .map(p => ({
       name: p.name,
+      archetype: p.archetype,
+      positions: p.positions,
       perim: p.attributes.perimeterDefense ?? 99,
       interior: p.attributes.interiorDefense ?? 99,
     }))
@@ -290,7 +292,7 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
 
   const hideTargets = [...myRoster]
     .filter(p => p.attributes && isPerimeter(p))
-    .map(p => ({ name: p.name, perim: p.attributes.perimeterDefense ?? 99 }))
+    .map(p => ({ name: p.name, archetype: p.archetype, perim: p.attributes.perimeterDefense ?? 99 }))
     .sort((a, b) => a.perim - b.perim)
     .slice(0, 3)
 
@@ -298,10 +300,45 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
     .filter(p => p.attributes && isPerimeter(p))
     .map(p => ({
       name: p.name,
+      archetype: p.archetype,
       three: p.attributes.threePointShot ?? 99,
       mid: p.attributes.midRangeShot ?? 99,
     }))
     .sort((a, b) => (a.three + a.mid) - (b.three + b.mid))
+    .slice(0, 3)
+
+  const speedAdvantage = [...myRoster]
+    .filter(p => p.attributes && isPerimeter(p))
+    .map(myP => {
+      const oppPos = myP.positions || []
+      const oppMatch = [...opponentRoster]
+        .filter(p => p.attributes && (p.positions || []).some(pos => oppPos.includes(pos)))
+        .sort((a, b) => (a.attributes.speed ?? 0) - (b.attributes.speed ?? 0))[0]
+      if (!oppMatch) return null
+      const diff = (myP.attributes.speed ?? 0) - (oppMatch.attributes.speed ?? 0)
+      return diff >= 8 ? {
+        myPlayer: myP.name,
+        mySpeed: myP.attributes.speed,
+        oppPlayer: oppMatch.name,
+        oppSpeed: oppMatch.attributes.speed,
+        diff,
+      } : null
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.diff - a.diff)
+    .slice(0, 3)
+
+  const clutchPlayers = [...myRoster]
+    .filter(p => p.attributes)
+    .map(p => ({
+      name: p.name,
+      overall: p.overall,
+      archetype: p.archetype,
+      shotIQ: p.attributes.shotIQ ?? 0,
+      offCon: p.attributes.offensiveConsistency ?? 0,
+      clutchScore: (p.attributes.shotIQ ?? 0) + (p.attributes.offensiveConsistency ?? 0),
+    }))
+    .sort((a, b) => b.clutchScore - a.clutchScore)
     .slice(0, 3)
 
   const HOF_TIERS = ['legendary', 'hall of fame', 'gold']
@@ -316,15 +353,14 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
       ),
     }))
 
-  const BIGS = ['C', 'PF']
   const bestMatchups = [...opponentRoster]
     .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
     .slice(0, 5)
     .map(threat => {
       const oppPos = threat.positions || []
-      const isBig = oppPos.some(p => BIGS.includes(p))
-      const defStat = isBig ? 'interiorDefense' : 'perimeterDefense'
-      const statLabel = isBig ? 'ID' : 'PD'
+      const big = oppPos.some(p => BIGS.includes(p))
+      const defStat = big ? 'interiorDefense' : 'perimeterDefense'
+      const statLabel = big ? 'Interior Defense' : 'Perimeter Defense'
 
       const samePos = myRoster.filter(p => p.attributes && (p.positions || []).some(pos => oppPos.includes(pos)))
       const pool = samePos.length > 0 ? samePos : myRoster.filter(p => p.attributes)
@@ -334,6 +370,7 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
         threat: threat.name,
         threatOverall: threat.overall,
         threatPos: oppPos[0],
+        threatArchetype: threat.archetype,
         defender: defender.name,
         defValue: defender.attributes[defStat] ?? '—',
         statLabel,
@@ -346,10 +383,25 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
     setPlanError(null)
     setGamePlan(null)
     try {
+      const myKeyPlayers = [...myRoster]
+        .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
+        .slice(0, 5)
+        .map(p => ({ name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions }))
+
+      const oppKeyPlayers = [...opponentRoster]
+        .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
+        .slice(0, 5)
+        .map(p => ({ name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions }))
+
       const res = await fetch(LAMBDA_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ myTeam, opponentTeam, attackTargets, hideTargets, leaveOpen }),
+        body: JSON.stringify({
+          myTeam, opponentTeam,
+          attackTargets, hideTargets, leaveOpen,
+          speedAdvantage, bestMatchups,
+          myKeyPlayers, oppKeyPlayers,
+        }),
       })
       if (!res.ok) throw new Error(`Lambda error ${res.status}`)
       const data = await res.json()
@@ -368,9 +420,7 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
       <p className="analyzer-subtitle">{myTeam} vs {opponentTeam}</p>
 
       {!planLoading && !gamePlan && (
-        <button className="analyze-btn ai-plan-btn" onClick={getAIGamePlan}>
-          Get AI Game Plan
-        </button>
+        <button className="analyze-btn ai-plan-btn" onClick={getAIGamePlan}>Get AI Game Plan</button>
       )}
       {planLoading && <div className="loading">Generating game plan…</div>}
       {planError && <div className="api-error">AI error: {planError}</div>}
@@ -391,9 +441,9 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
             <div key={i} className="analysis-row">
               <span className="analysis-name">{p.name}</span>
               <span className="analysis-stats">
-                <span style={{ color: getRatingColor(p.perim) }}>PD {p.perim}</span>
+                <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
                 {' / '}
-                <span style={{ color: getRatingColor(p.interior) }}>ID {p.interior}</span>
+                <span style={{ color: getRatingColor(p.interior) }}>Int. Def {p.interior}</span>
               </span>
             </div>
           ))}
@@ -401,13 +451,13 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
 
         <div className="analysis-card">
           <div className="analysis-card-title">Hide Defensively</div>
-          <p className="analysis-hint">Weakest defenders on {myTeam} — keep off the ball</p>
+          <p className="analysis-hint">Weakest perimeter defenders on {myTeam}</p>
           {hideTargets.length === 0 && <p className="no-data">Insufficient data</p>}
           {hideTargets.map((p, i) => (
             <div key={i} className="analysis-row">
               <span className="analysis-name">{p.name}</span>
               <span className="analysis-stats">
-                <span style={{ color: getRatingColor(p.perim) }}>PD {p.perim}</span>
+                <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
               </span>
             </div>
           ))}
@@ -415,15 +465,51 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
 
         <div className="analysis-card">
           <div className="analysis-card-title">Leave Open</div>
-          <p className="analysis-hint">Worst shooters on {opponentTeam} — sag off to help elsewhere</p>
+          <p className="analysis-hint">Worst shooters on {opponentTeam} — sag off to help</p>
           {leaveOpen.length === 0 && <p className="no-data">Insufficient data</p>}
           {leaveOpen.map((p, i) => (
             <div key={i} className="analysis-row">
               <span className="analysis-name">{p.name}</span>
               <span className="analysis-stats">
-                <span style={{ color: getRatingColor(p.three) }}>3PT {p.three}</span>
+                <span style={{ color: getRatingColor(p.three) }}>Three-Point {p.three}</span>
                 {' / '}
-                <span style={{ color: getRatingColor(p.mid) }}>MID {p.mid}</span>
+                <span style={{ color: getRatingColor(p.mid) }}>Mid-Range {p.mid}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="analysis-card">
+          <div className="analysis-card-title">Speed Advantage</div>
+          <p className="analysis-hint">Your guards/wings who significantly outrun their matchup</p>
+          {speedAdvantage.length === 0 && <p className="no-data">No major speed mismatches</p>}
+          {speedAdvantage.map((m, i) => (
+            <div key={i} className="analysis-row">
+              <div className="matchup-pair">
+                <span className="matchup-threat">
+                  {m.myPlayer}
+                  <span style={{ color: getRatingColor(m.mySpeed), marginLeft: 6, fontSize: 12 }}>Speed {m.mySpeed}</span>
+                </span>
+                <span className="matchup-arrow">vs</span>
+                <span className="matchup-defender">
+                  {m.oppPlayer}
+                  <span style={{ color: getRatingColor(m.oppSpeed), marginLeft: 6, fontSize: 12 }}>Speed {m.oppSpeed}</span>
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="analysis-card">
+          <div className="analysis-card-title">Clutch Players</div>
+          <p className="analysis-hint">Highest Shot IQ + Offensive Consistency — go-to players in tight moments</p>
+          {clutchPlayers.map((p, i) => (
+            <div key={i} className="analysis-row">
+              <span className="analysis-name">{p.name}</span>
+              <span className="analysis-stats">
+                <span style={{ color: getRatingColor(p.shotIQ) }}>Shot IQ {p.shotIQ}</span>
+                {' / '}
+                <span style={{ color: getRatingColor(p.offCon) }}>Off. Con {p.offCon}</span>
               </span>
             </div>
           ))}
@@ -467,6 +553,15 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
                   ))}
                 </div>
               ) : (
+                <span className="no-data">No Legendary/HoF/Gold badges</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
                 <span className="no-data">No Legendary/HoF/Gold badges</span>
               )}
             </div>
