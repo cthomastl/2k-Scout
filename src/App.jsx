@@ -40,48 +40,25 @@ function getBadgeTierLabel(tier) {
   return tier.charAt(0).toUpperCase() + tier.slice(1)
 }
 
-function computeMatchupScore(myRoster, oppRoster) {
+function computeMatchupEdges(myRoster, oppRoster) {
   const PERIM = ['PG', 'SG', 'SF']
+  const BIGS  = ['C', 'PF']
   const withAttrs = r => r.filter(p => p.attributes)
-  const top5 = r => [...withAttrs(r)].sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0)).slice(0, 5)
-  const avg = (arr, fn) => {
+  const top5  = r => [...withAttrs(r)].sort((a, b) => (b.overall??0) - (a.overall??0)).slice(0, 5)
+  const avg   = (arr, fn) => {
     const vals = arr.map(fn).filter(v => v > 0)
-    return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0
+    return vals.length ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : 0
   }
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
-  const edgeScore = (mine, theirs, scale) => clamp(50 + (mine - theirs) * scale, 0, 100)
+  const perim = r => withAttrs(r).filter(p => (p.positions||[]).some(pos => PERIM.includes(pos)))
+  const bigs  = r => withAttrs(r).filter(p => (p.positions||[]).some(pos => BIGS.includes(pos)))
 
-  const myTop = top5(myRoster)
-  const oppTop = top5(oppRoster)
-
-  const myOvr     = avg(myTop,  p => p.overall ?? 0)
-  const oppOvr    = avg(oppTop, p => p.overall ?? 0)
-  const myScoring = avg(myTop,  p => Math.max(p.attributes.midRangeShot ?? 0, p.attributes.threePointShot ?? 0, p.attributes.closeShot ?? 0))
-  const oppScoring= avg(oppTop, p => Math.max(p.attributes.midRangeShot ?? 0, p.attributes.threePointShot ?? 0, p.attributes.closeShot ?? 0))
-  const myDef     = avg(myTop,  p => Math.max(p.attributes.perimeterDefense ?? 0, p.attributes.interiorDefense ?? 0))
-  const oppDef    = avg(oppTop, p => Math.max(p.attributes.perimeterDefense ?? 0, p.attributes.interiorDefense ?? 0))
-  const mySpeed   = avg(withAttrs(myRoster).filter(p  => (p.positions||[]).some(pos => PERIM.includes(pos))),  p => p.attributes.speed ?? 0)
-  const oppSpeed  = avg(withAttrs(oppRoster).filter(p => (p.positions||[]).some(pos => PERIM.includes(pos))), p => p.attributes.speed ?? 0)
-
-  const ovrScore   = edgeScore(myOvr,     oppOvr,     3)
-  const offScore   = edgeScore(myScoring, oppDef,     0.6)
-  const defScore   = edgeScore(myDef,     oppScoring, 0.6)
-  const speedScore = edgeScore(mySpeed,   oppSpeed,   1.5)
-  const overall    = ovrScore * 0.4 + offScore * 0.25 + defScore * 0.25 + speedScore * 0.1
-
-  const grade      = overall >= 65 ? 'A' : overall >= 55 ? 'B' : overall >= 45 ? 'C' : overall >= 35 ? 'D' : 'F'
-  const gradeColor = overall >= 65 ? '#22c55e' : overall >= 55 ? '#86efac' : overall >= 45 ? '#eab308' : overall >= 35 ? '#f97316' : '#ef4444'
-  const summary    = overall >= 65 ? 'Strong Advantage' : overall >= 55 ? 'Slight Edge' : overall >= 45 ? 'Even Matchup' : overall >= 35 ? 'Underdog' : 'Heavy Underdog'
-
-  return {
-    overall: Math.round(overall), grade, gradeColor, summary,
-    dimensions: [
-      { label: 'Overall', score: Math.round(ovrScore) },
-      { label: 'Offense', score: Math.round(offScore) },
-      { label: 'Defense', score: Math.round(defScore) },
-      { label: 'Speed',   score: Math.round(speedScore) },
-    ],
-  }
+  return [
+    { label: 'Top 5 OVR',    my: avg(top5(myRoster),   p => p.overall ?? 0),                        opp: avg(top5(oppRoster),   p => p.overall ?? 0) },
+    { label: 'Speed',         my: avg(perim(myRoster),  p => p.attributes.speed ?? 0),               opp: avg(perim(oppRoster),  p => p.attributes.speed ?? 0) },
+    { label: 'Perimeter Def', my: avg(top5(myRoster),   p => p.attributes.perimeterDefense ?? 0),    opp: avg(top5(oppRoster),   p => p.attributes.perimeterDefense ?? 0) },
+    { label: 'Interior Def',  my: avg(bigs(myRoster).length ? bigs(myRoster) : top5(myRoster),  p => p.attributes.interiorDefense ?? 0), opp: avg(bigs(oppRoster).length ? bigs(oppRoster) : top5(oppRoster), p => p.attributes.interiorDefense ?? 0) },
+    { label: '3PT Shooting',  my: avg(perim(myRoster),  p => p.attributes.threePointShot ?? 0),      opp: avg(perim(oppRoster),  p => p.attributes.threePointShot ?? 0) },
+  ]
 }
 
 function StatRow({ label, value }) {
@@ -505,18 +482,24 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
   const bigNames = new Set(bigPool.map(p => p.name))
   const twinTowersLineup = [...bigPool, ...[...withAttrs].filter(p => !bigNames.has(p.name)).sort((a, b) => (b.overall??0) - (a.overall??0)).slice(0, 3)]
 
+  const shooterLineup = [...withAttrs]
+    .sort((a, b) => (b.attributes.threePointShot ?? 0) - (a.attributes.threePointShot ?? 0))
+    .slice(0, 5)
+
   const lineups = [
     { name: 'Closing Lineup', desc: 'High-IQ players for tight fourth-quarter situations', players: closingLineup,
       getStat: p => ({ label: 'Shot IQ', val: p.attributes.shotIQ ?? '—' }) },
     { name: 'Pace & Space', desc: 'Push tempo and stretch the floor with speed and shooting', players: paceLineup,
       getStat: p => ({ label: 'Speed', val: p.attributes.speed ?? '—' }) },
+    { name: 'Sharpshooters', desc: 'Best 3PT shooters to space the floor and punish close-outs', players: shooterLineup,
+      getStat: p => ({ label: '3PT', val: p.attributes.threePointShot ?? '—' }) },
     { name: 'Lockdown', desc: 'Maximum defensive pressure across all positions', players: lockdownLineup,
       getStat: p => ({ label: isBigP(p) ? 'Int. Def' : 'Per. Def', val: (isBigP(p) ? p.attributes.interiorDefense : p.attributes.perimeterDefense) ?? '—' }) },
     { name: 'Twin Towers', desc: 'Two bigs for interior dominance and paint presence', players: twinTowersLineup,
       getStat: p => ({ label: isBigP(p) ? 'Int. Def' : 'Speed', val: (isBigP(p) ? p.attributes.interiorDefense : p.attributes.speed) ?? '—' }) },
   ]
 
-  const score = computeMatchupScore(myRoster, opponentRoster)
+  const edges = computeMatchupEdges(myRoster, opponentRoster)
   const TABS = [
     { id: 'scouting', label: 'Scouting' },
     { id: 'matchups', label: 'Matchups' },
@@ -529,22 +512,25 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
       <h2 className="analyzer-title">Matchup Analyzer</h2>
       <p className="analyzer-subtitle">{myTeam} vs {opponentTeam}</p>
 
-      <div className="matchup-score-card">
-        <div className="matchup-score-left">
-          <div className="matchup-grade" style={{ color: score.gradeColor }}>{score.grade}</div>
-          <div className="matchup-summary">{score.summary}</div>
+      <div className="matchup-edges-card">
+        <div className="matchup-edges-header">
+          <span className="edges-team-name">{myTeam}</span>
+          <span className="edges-center-title">Matchup Edges</span>
+          <span className="edges-team-name edges-team-opp">{opponentTeam}</span>
         </div>
-        <div className="matchup-score-dims">
-          {score.dimensions.map((d, i) => (
-            <div key={i} className="score-dim">
-              <div className="score-dim-label">{d.label}</div>
-              <div className="score-dim-bar">
-                <div className="score-dim-fill" style={{ width: `${d.score}%`, background: d.score >= 55 ? '#22c55e' : d.score >= 45 ? '#eab308' : '#ef4444' }} />
-              </div>
-              <div className="score-dim-val" style={{ color: d.score >= 55 ? '#22c55e' : d.score >= 45 ? '#eab308' : '#ef4444' }}>{d.score}</div>
+        {edges.map((e, i) => {
+          const myWins = e.my > e.opp
+          const tie = e.my === e.opp
+          const myColor  = tie ? '#64748b' : myWins ? '#22c55e' : '#ef4444'
+          const oppColor = tie ? '#64748b' : !myWins ? '#22c55e' : '#ef4444'
+          return (
+            <div key={i} className="edge-row">
+              <span className="edge-val" style={{ color: myColor }}>{e.my}</span>
+              <span className="edge-label">{e.label}</span>
+              <span className="edge-val edge-val-opp" style={{ color: oppColor }}>{e.opp}</span>
             </div>
-          ))}
-        </div>
+          )
+        })}
       </div>
 
       <div className="analyzer-tabs">

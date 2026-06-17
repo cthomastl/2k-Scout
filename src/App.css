@@ -325,81 +325,72 @@ body {
   white-space: nowrap;
 }
 
-/* ── Matchup Score Card ── */
-.matchup-score-card {
-  display: flex;
-  align-items: center;
-  gap: 24px;
+/* ── Matchup Edges Card ── */
+.matchup-edges-card {
   background: #0f172a;
   border: 1px solid #1e2330;
   border-radius: 10px;
-  padding: 16px 20px;
+  padding: 14px 18px;
   margin-bottom: 16px;
 }
 
-.matchup-score-left {
-  text-align: center;
-  min-width: 80px;
+.matchup-edges-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #1e2330;
 }
 
-.matchup-grade {
-  font-size: 52px;
-  font-weight: 900;
-  line-height: 1;
+.edges-team-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: #f1f5f9;
+  max-width: 130px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.matchup-summary {
+.edges-team-opp { text-align: right; }
+
+.edges-center-title {
   font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #475569;
+  flex-shrink: 0;
+  padding: 0 8px;
+}
+
+.edge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(30, 35, 48, 0.4);
+}
+
+.edge-row:last-child { border-bottom: none; }
+
+.edge-val {
+  font-size: 17px;
+  font-weight: 800;
+  min-width: 38px;
+  text-align: center;
+}
+
+.edge-val-opp { text-align: center; }
+
+.edge-label {
+  font-size: 11px;
   color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-top: 4px;
-}
-
-.matchup-score-dims {
+  text-align: center;
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.score-dim {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.score-dim-label {
-  font-size: 11px;
-  color: #64748b;
-  width: 56px;
-  flex-shrink: 0;
-}
-
-.score-dim-bar {
-  flex: 1;
-  height: 5px;
-  background: #1e2330;
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.score-dim-fill {
-  height: 100%;
-  border-radius: 3px;
-}
-
-.score-dim-val {
-  font-size: 12px;
-  font-weight: 700;
-  width: 28px;
-  text-align: right;
-  flex-shrink: 0;
-}
-
-@media (max-width: 500px) {
-  .matchup-score-card { flex-direction: column; align-items: flex-start; gap: 12px; }
-  .matchup-score-left { display: flex; align-items: center; gap: 12px; }
 }
 
 /* ── Analyzer tabs ── */
@@ -430,8 +421,12 @@ body {
 /* ── Lineups ── */
 .lineups-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 14px;
+}
+
+@media (max-width: 800px) {
+  .lineups-grid { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 600px) {
