@@ -128,7 +128,8 @@ export const handler = async (event) => {
     })
 
     const textBlock = message.content.find(b => b.type === 'text')
-    const gamePlan = textBlock?.text ?? 'No game plan generated.'
+    if (!textBlock?.text) throw new Error('No text response returned from Claude')
+    const gamePlan = textBlock.text
 
     return {
       statusCode: 200,
