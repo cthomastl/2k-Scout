@@ -482,9 +482,22 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
   const bigNames = new Set(bigPool.map(p => p.name))
   const twinTowersLineup = [...bigPool, ...[...withAttrs].filter(p => !bigNames.has(p.name)).sort((a, b) => (b.overall??0) - (a.overall??0)).slice(0, 3)]
 
-  const shooterLineup = [...withAttrs]
-    .sort((a, b) => (b.attributes.threePointShot ?? 0) - (a.attributes.threePointShot ?? 0))
-    .slice(0, 5)
+  const shooterLineup = (() => {
+    const sorted = [...withAttrs].sort((a, b) => (b.attributes.threePointShot ?? 0) - (a.attributes.threePointShot ?? 0))
+    const slots = ['PG', 'SG', 'SF', 'PF', 'C']
+    const used = new Set()
+    const result = []
+    for (const slot of slots) {
+      const match = sorted.find(p => !used.has(p.name) && (p.positions || []).includes(slot))
+      if (match) { used.add(match.name); result.push(match) }
+    }
+    // fill any remaining slots from the sorted pool
+    for (const p of sorted) {
+      if (result.length >= 5) break
+      if (!used.has(p.name)) { used.add(p.name); result.push(p) }
+    }
+    return result
+  })()
 
   const lineups = [
     { name: 'Closing Lineup', desc: 'High-IQ players for tight fourth-quarter situations', players: closingLineup,
