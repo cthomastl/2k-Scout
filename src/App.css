@@ -313,6 +313,95 @@ body {
   font-style: italic;
 }
 
+/* ── Trend tags ── */
+.trend-tag {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid;
+  letter-spacing: 0.4px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ── Matchup Score Card ── */
+.matchup-score-card {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  background: #0f172a;
+  border: 1px solid #1e2330;
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+
+.matchup-score-left {
+  text-align: center;
+  min-width: 80px;
+}
+
+.matchup-grade {
+  font-size: 52px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.matchup-summary {
+  font-size: 10px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+
+.matchup-score-dims {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.score-dim {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.score-dim-label {
+  font-size: 11px;
+  color: #64748b;
+  width: 56px;
+  flex-shrink: 0;
+}
+
+.score-dim-bar {
+  flex: 1;
+  height: 5px;
+  background: #1e2330;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.score-dim-fill {
+  height: 100%;
+  border-radius: 3px;
+}
+
+.score-dim-val {
+  font-size: 12px;
+  font-weight: 700;
+  width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+@media (max-width: 500px) {
+  .matchup-score-card { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .matchup-score-left { display: flex; align-items: center; gap: 12px; }
+}
+
 /* ── Matchup Analyzer ── */
 .matchup-analyzer {
   margin-top: 24px;

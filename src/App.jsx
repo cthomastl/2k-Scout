@@ -40,6 +40,64 @@ function getBadgeTierLabel(tier) {
   return tier.charAt(0).toUpperCase() + tier.slice(1)
 }
 
+function getTrendTags(player) {
+  if (!player.attributes) return []
+  const a = player.attributes
+  const tags = []
+  const bestShooting = Math.max(a.midRangeShot ?? 0, a.threePointShot ?? 0, a.closeShot ?? 0)
+  const bestDef = Math.max(a.perimeterDefense ?? 0, a.interiorDefense ?? 0)
+  const playmakingAvg = ((a.ballHandle ?? 0) + (a.passAccuracy ?? 0)) / 2
+  if (bestShooting >= 88) tags.push({ label: 'SCORER', color: '#f97316' })
+  if (bestDef >= 90) tags.push({ label: 'LOCKDOWN', color: '#3b82f6' })
+  if (playmakingAvg >= 88) tags.push({ label: 'PLAYMAKER', color: '#06b6d4' })
+  if ((a.speed ?? 0) >= 92) tags.push({ label: 'SPEED', color: '#22c55e' })
+  return tags.slice(0, 2)
+}
+
+function computeMatchupScore(myRoster, oppRoster) {
+  const PERIM = ['PG', 'SG', 'SF']
+  const withAttrs = r => r.filter(p => p.attributes)
+  const top5 = r => [...withAttrs(r)].sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0)).slice(0, 5)
+  const avg = (arr, fn) => {
+    const vals = arr.map(fn).filter(v => v > 0)
+    return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0
+  }
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
+  const edgeScore = (mine, theirs, scale) => clamp(50 + (mine - theirs) * scale, 0, 100)
+
+  const myTop = top5(myRoster)
+  const oppTop = top5(oppRoster)
+
+  const myOvr     = avg(myTop,  p => p.overall ?? 0)
+  const oppOvr    = avg(oppTop, p => p.overall ?? 0)
+  const myScoring = avg(myTop,  p => Math.max(p.attributes.midRangeShot ?? 0, p.attributes.threePointShot ?? 0, p.attributes.closeShot ?? 0))
+  const oppScoring= avg(oppTop, p => Math.max(p.attributes.midRangeShot ?? 0, p.attributes.threePointShot ?? 0, p.attributes.closeShot ?? 0))
+  const myDef     = avg(myTop,  p => Math.max(p.attributes.perimeterDefense ?? 0, p.attributes.interiorDefense ?? 0))
+  const oppDef    = avg(oppTop, p => Math.max(p.attributes.perimeterDefense ?? 0, p.attributes.interiorDefense ?? 0))
+  const mySpeed   = avg(withAttrs(myRoster).filter(p  => (p.positions||[]).some(pos => PERIM.includes(pos))),  p => p.attributes.speed ?? 0)
+  const oppSpeed  = avg(withAttrs(oppRoster).filter(p => (p.positions||[]).some(pos => PERIM.includes(pos))), p => p.attributes.speed ?? 0)
+
+  const ovrScore   = edgeScore(myOvr,     oppOvr,     3)
+  const offScore   = edgeScore(myScoring, oppDef,     0.6)
+  const defScore   = edgeScore(myDef,     oppScoring, 0.6)
+  const speedScore = edgeScore(mySpeed,   oppSpeed,   1.5)
+  const overall    = ovrScore * 0.4 + offScore * 0.25 + defScore * 0.25 + speedScore * 0.1
+
+  const grade      = overall >= 65 ? 'A' : overall >= 55 ? 'B' : overall >= 45 ? 'C' : overall >= 35 ? 'D' : 'F'
+  const gradeColor = overall >= 65 ? '#22c55e' : overall >= 55 ? '#86efac' : overall >= 45 ? '#eab308' : overall >= 35 ? '#f97316' : '#ef4444'
+  const summary    = overall >= 65 ? 'Strong Advantage' : overall >= 55 ? 'Slight Edge' : overall >= 45 ? 'Even Matchup' : overall >= 35 ? 'Underdog' : 'Heavy Underdog'
+
+  return {
+    overall: Math.round(overall), grade, gradeColor, summary,
+    dimensions: [
+      { label: 'Overall', score: Math.round(ovrScore) },
+      { label: 'Offense', score: Math.round(offScore) },
+      { label: 'Defense', score: Math.round(defScore) },
+      { label: 'Speed',   score: Math.round(speedScore) },
+    ],
+  }
+}
+
 function StatRow({ label, value }) {
   return (
     <div className="stat-row">
@@ -162,6 +220,9 @@ function PlayerCard({ player, teamName }) {
               {overall}
             </span>
           )}
+          {getTrendTags(player).map((tag, i) => (
+            <span key={i} className="trend-tag" style={{ color: tag.color, borderColor: tag.color }}>{tag.label}</span>
+          ))}
         </span>
         <span className="expand-arrow">{expanded ? '▲' : '▼'}</span>
       </button>
@@ -437,6 +498,29 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
           <button className="analyze-btn ai-plan-btn ai-plan-regen" onClick={getAIGamePlan}>Regenerate</button>
         </div>
       )}
+
+      {(() => {
+        const score = computeMatchupScore(myRoster, opponentRoster)
+        return (
+          <div className="matchup-score-card">
+            <div className="matchup-score-left">
+              <div className="matchup-grade" style={{ color: score.gradeColor }}>{score.grade}</div>
+              <div className="matchup-summary">{score.summary}</div>
+            </div>
+            <div className="matchup-score-dims">
+              {score.dimensions.map((d, i) => (
+                <div key={i} className="score-dim">
+                  <div className="score-dim-label">{d.label}</div>
+                  <div className="score-dim-bar">
+                    <div className="score-dim-fill" style={{ width: `${d.score}%`, background: d.score >= 55 ? '#22c55e' : d.score >= 45 ? '#eab308' : '#ef4444' }} />
+                  </div>
+                  <div className="score-dim-val" style={{ color: d.score >= 55 ? '#22c55e' : d.score >= 45 ? '#eab308' : '#ef4444' }}>{d.score}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
 
       <div className="analysis-grid">
         <div className="analysis-card">
