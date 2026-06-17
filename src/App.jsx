@@ -24,10 +24,11 @@ function getRatingColor(val) {
 function getBadgeTierColor(tier) {
   if (!tier) return '#9ca3af'
   const t = tier.toLowerCase()
-  if (t === 'hall of fame' || t === 'hof' || t === 'legend') return '#f59e0b'
+  if (t === 'legendary') return '#a855f7'
+  if (t === 'hall of fame' || t === 'hof') return '#f59e0b'
   if (t === 'gold') return '#eab308'
   if (t === 'silver') return '#94a3b8'
-  if (t === 'bronze') return '#92400e'
+  if (t === 'bronze') return '#b45309'
   return '#9ca3af'
 }
 
@@ -35,6 +36,7 @@ function getBadgeTierLabel(tier) {
   if (!tier) return tier
   const t = tier.toLowerCase()
   if (t === 'hall of fame' || t === 'hof') return 'HoF'
+  if (t === 'legendary') return 'Legend'
   return tier.charAt(0).toUpperCase() + tier.slice(1)
 }
 
@@ -83,19 +85,22 @@ const ATHLETIC_STATS = [
 ]
 
 function BadgeList({ badges }) {
-  if (badges === null) {
-    return <p className="badge-unavailable">Badge data unavailable for this player.</p>
-  }
   if (!Array.isArray(badges) || badges.length === 0) {
     return <p className="badge-unavailable">No badges.</p>
   }
 
-  const tierOrder = ['hall of fame', 'hof', 'legend', 'gold', 'silver', 'bronze']
-  const sorted = [...badges].sort((a, b) => {
-    const ta = (a.tier || '').toLowerCase()
-    const tb = (b.tier || '').toLowerCase()
-    const ia = tierOrder.findIndex(t => ta.includes(t))
-    const ib = tierOrder.findIndex(t => tb.includes(t))
+  // API returns each badge twice — deduplicate by name
+  const seen = new Set()
+  const unique = badges.filter(b => {
+    if (seen.has(b.name)) return false
+    seen.add(b.name)
+    return true
+  })
+
+  const tierOrder = ['legendary', 'hall of fame', 'gold', 'silver', 'bronze']
+  const sorted = [...unique].sort((a, b) => {
+    const ia = tierOrder.findIndex(t => (a.tier || '').toLowerCase().includes(t))
+    const ib = tierOrder.findIndex(t => (b.tier || '').toLowerCase().includes(t))
     return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)
   })
 
@@ -107,7 +112,7 @@ function BadgeList({ badges }) {
           className="badge-chip"
           style={{ borderColor: getBadgeTierColor(badge.tier), color: getBadgeTierColor(badge.tier) }}
         >
-          {badge.name || badge.badge_name || badge.label || JSON.stringify(badge)}
+          {badge.name}
           {badge.tier && <span className="badge-tier"> · {getBadgeTierLabel(badge.tier)}</span>}
         </span>
       ))}
@@ -188,14 +193,14 @@ function PlayerCard({ player, teamName }) {
               </div>
 
               <div className="stats-grid">
-                <StatGroup title="Offense" stats={OFFENSE_STATS} playerData={detail} />
-                <StatGroup title="Defense" stats={DEFENSE_STATS} playerData={detail} />
-                <StatGroup title="Athletic" stats={ATHLETIC_STATS} playerData={detail} />
+                <StatGroup title="Offense" stats={OFFENSE_STATS} playerData={detail.attributes || {}} />
+                <StatGroup title="Defense" stats={DEFENSE_STATS} playerData={detail.attributes || {}} />
+                <StatGroup title="Athletic" stats={ATHLETIC_STATS} playerData={detail.attributes || {}} />
               </div>
 
               <div className="badges-section">
                 <div className="badges-title">Badges</div>
-                <BadgeList badges={detail.badges !== undefined ? detail.badges : null} />
+                <BadgeList badges={detail.badges?.list ?? []} />
               </div>
             </div>
           )}
@@ -300,11 +305,11 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
 
   const attackTargets = oppDetailsList.length
     ? [...oppDetailsList]
-        .filter(p => p.perimeterDefense !== undefined || p.interiorDefense !== undefined)
+        .filter(p => p.attributes)
         .map(p => ({
           name: p.name,
-          perim: parseInt(p.perimeterDefense) || 99,
-          interior: parseInt(p.interiorDefense) || 99,
+          perim: p.attributes.perimeterDefense ?? 99,
+          interior: p.attributes.interiorDefense ?? 99,
         }))
         .sort((a, b) => (a.perim + a.interior) - (b.perim + b.interior))
         .slice(0, 3)
@@ -312,14 +317,35 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
 
   const hideTargets = myDetailsList.length
     ? [...myDetailsList]
-        .filter(p => p.perimeterDefense !== undefined)
-        .map(p => ({ name: p.name, perim: parseInt(p.perimeterDefense) || 99 }))
+        .filter(p => p.attributes)
+        .map(p => ({ name: p.name, perim: p.attributes.perimeterDefense ?? 99 }))
         .sort((a, b) => a.perim - b.perim)
         .slice(0, 3)
     : []
 
-  const myAdvantages = []
-  const oppAdvantages = []
+  const HOF_TIERS = ['legendary', 'hall of fame', 'gold']
+  function getHighBadges(detailsList) {
+    const result = {}
+    detailsList.forEach(p => {
+      const list = p.badges?.list
+      if (!Array.isArray(list)) return
+      const seen = new Set()
+      list.forEach(b => {
+        if (seen.has(b.name)) return
+        seen.add(b.name)
+        const tier = (b.tier || '').toLowerCase()
+        if (HOF_TIERS.some(t => tier.includes(t))) {
+          if (!result[b.name]) result[b.name] = { tier: b.tier, player: p.name }
+        }
+      })
+    })
+    return result
+  }
+
+  const myBadgeMap = getHighBadges(myDetailsList)
+  const oppBadgeMap = getHighBadges(oppDetailsList)
+  const myAdvantages = Object.entries(myBadgeMap).filter(([name]) => !oppBadgeMap[name])
+  const oppAdvantages = Object.entries(oppBadgeMap).filter(([name]) => !myBadgeMap[name])
 
   async function getAIGamePlan() {
     setPlanLoading(true)
