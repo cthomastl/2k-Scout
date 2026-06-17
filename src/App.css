@@ -774,6 +774,40 @@ body {
   margin-top: 40px;
 }
 
+.spinner-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px 16px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.spinner-wrap.center-loading {
+  margin-top: 40px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #1e293b;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.spinner.spinner-sm {
+  width: 22px;
+  height: 22px;
+  border-width: 2px;
+}
+
 .api-error {
   color: #ef4444;
   background: #1f0d0d;

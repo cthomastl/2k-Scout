@@ -61,6 +61,15 @@ function computeMatchupEdges(myRoster, oppRoster) {
   ]
 }
 
+function Spinner({ small, label, center }) {
+  return (
+    <div className={`spinner-wrap${center ? ' center-loading' : ''}`}>
+      <div className={`spinner${small ? ' spinner-sm' : ''}`} />
+      {label && <span>{label}</span>}
+    </div>
+  )
+}
+
 function StatRow({ label, value }) {
   return (
     <div className="stat-row">
@@ -252,7 +261,7 @@ function TeamPanel({ side, selectedTeam, onTeamChange, teams, roster, loading, e
         </select>
       </div>
 
-      {loading && <div className="loading">Loading roster…</div>}
+      {loading && <Spinner small label="Loading roster…" />}
       {error && <div className="api-error">Error: {error}</div>}
 
       {roster.length > 0 && (
@@ -724,7 +733,7 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
           {!planLoading && !gamePlan && (
             <button className="analyze-btn ai-plan-btn" onClick={getAIGamePlan}>Get AI Game Plan</button>
           )}
-          {planLoading && <div className="loading">Generating game plan…</div>}
+          {planLoading && <Spinner label="Generating game plan…" />}
           {planError && <div className="api-error">AI error: {planError}</div>}
           {gamePlan && (
             <div className="game-plan">
@@ -801,7 +810,7 @@ export default function App() {
         <p className="app-subtitle">Pre-game scouting for NBA 2K All-Time teams</p>
       </header>
 
-      {teamsLoading && <div className="loading center-loading">Loading teams…</div>}
+      {teamsLoading && <Spinner center label="Loading teams…" />}
       {teamsError && <div className="api-error center-loading">Failed to load teams: {teamsError}</div>}
 
       {!teamsLoading && (
