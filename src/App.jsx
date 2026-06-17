@@ -317,6 +317,7 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
   const [planLoading, setPlanLoading] = useState(false)
   const [planError, setPlanError] = useState(null)
   const [activeTab, setActiveTab] = useState('scouting')
+  const [opponentStrategy, setOpponentStrategy] = useState('')
 
   const PERIMETER = ['PG', 'SG', 'SF']
   const BIGS = ['C', 'PF']
@@ -325,13 +326,21 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
 
   const attackTargets = [...opponentRoster]
     .filter(p => p.attributes)
-    .map(p => ({
-      name: p.name,
-      archetype: p.archetype,
-      positions: p.positions,
-      perim: p.attributes.perimeterDefense ?? 99,
-      interior: p.attributes.interiorDefense ?? 99,
-    }))
+    .map(p => {
+      const pos = p.positions || []
+      const isB = pos.some(pp => BIGS.includes(pp))
+      const perim = p.attributes.perimeterDefense ?? 99
+      const interior = p.attributes.interiorDefense ?? 99
+      let attackHint
+      if (isB) {
+        attackHint = perim <= interior
+          ? 'stretch big — low PD means cannot guard on perimeter; use a shooter to pull them away from the paint'
+          : 'paint target — low interior defense; post up or attack the basket against them'
+      } else {
+        attackHint = 'ISO/drive target — low perimeter defense; blow past them on the wing or in isolation'
+      }
+      return { name: p.name, archetype: p.archetype, positions: pos, perim, interior, attackHint }
+    })
     .sort((a, b) => (a.perim + a.interior) - (b.perim + b.interior))
     .slice(0, 3)
 
@@ -434,15 +443,21 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
     setPlanError(null)
     setGamePlan(null)
     try {
+      const HOF_BADGE_TIERS = ['legendary', 'hall of fame', 'gold']
+      const topBadges = p => dedupeByName(p.badges?.list ?? [])
+        .filter(b => HOF_BADGE_TIERS.some(t => (b.tier||'').toLowerCase().includes(t)))
+        .slice(0, 5)
+        .map(b => `${b.name} (${getBadgeTierLabel(b.tier)})`)
+
       const myKeyPlayers = [...myRoster]
         .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
         .slice(0, 5)
-        .map(p => ({ name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions }))
+        .map(p => ({ name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions, badges: topBadges(p) }))
 
       const oppKeyPlayers = [...opponentRoster]
         .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
         .slice(0, 5)
-        .map(p => ({ name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions }))
+        .map(p => ({ name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions, badges: topBadges(p) }))
 
       const res = await fetch(LAMBDA_URL, {
         method: 'POST',
@@ -452,6 +467,7 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
           attackTargets, hideTargets, leaveOpen,
           speedAdvantage, bestMatchups,
           myKeyPlayers, oppKeyPlayers,
+          opponentStrategy: opponentStrategy.trim(),
         }),
       })
       if (!res.ok) throw new Error(`Lambda error ${res.status}`)
@@ -695,6 +711,16 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
 
       {activeTab === 'ai-plan' && (
         <div className="ai-plan-tab">
+          <div className="strategy-input-group">
+            <label className="strategy-label">Opponent's offensive strategy (optional)</label>
+            <textarea
+              className="strategy-textarea"
+              placeholder="e.g. heavy pick and roll with their center, lots of corner 3s, iso-heavy on their best player..."
+              value={opponentStrategy}
+              onChange={e => setOpponentStrategy(e.target.value)}
+              rows={3}
+            />
+          </div>
           {!planLoading && !gamePlan && (
             <button className="analyze-btn ai-plan-btn" onClick={getAIGamePlan}>Get AI Game Plan</button>
           )}
