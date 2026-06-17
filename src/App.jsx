@@ -133,9 +133,9 @@ function PlayerCard({ player, teamName }) {
     setLoading(true)
     setError(null)
     try {
-      const data = await apiFetch(`/api/players/slug/${slug}?teamType=allt&team=${encodeURIComponent(teamName)}`)
-      console.log(`Player detail for ${player.name}:`, JSON.stringify(data, null, 2))
-
+      const res = await apiFetch(`/api/players/slug/${slug}?teamType=allt&team=${encodeURIComponent(teamName)}`)
+      console.log(`Player detail for ${player.name}:`, JSON.stringify(res, null, 2))
+      const data = res.data ?? res
       setDetail(data)
     } catch (e) {
       setError(e.message)
@@ -273,8 +273,8 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
         for (const player of roster) {
           const slug = player.slug || player.name?.toLowerCase().replace(/\s+/g, '-')
           try {
-            const data = await apiFetch(`/api/players/slug/${slug}?teamType=allt&team=${encodeURIComponent(teamName)}`)
-            results[slug] = data
+            const res = await apiFetch(`/api/players/slug/${slug}?teamType=allt&team=${encodeURIComponent(teamName)}`)
+            results[slug] = res.data ?? res
           } catch {
             // skip failed players
           }
