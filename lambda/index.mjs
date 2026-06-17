@@ -122,13 +122,12 @@ export const handler = async (event) => {
 
     const message = await client.messages.create({
       model: 'claude-opus-4-8',
-      max_tokens: 1800,
-      thinking: { type: 'adaptive' },
+      max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }],
     })
 
     const textBlock = message.content.find(b => b.type === 'text')
-    if (!textBlock?.text) throw new Error('No text response returned from Claude')
+    if (!textBlock) throw new Error('No text block in Claude response')
     const gamePlan = textBlock.text
 
     return {
