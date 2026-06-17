@@ -40,20 +40,6 @@ function getBadgeTierLabel(tier) {
   return tier.charAt(0).toUpperCase() + tier.slice(1)
 }
 
-function getTrendTags(player) {
-  if (!player.attributes) return []
-  const a = player.attributes
-  const tags = []
-  const bestShooting = Math.max(a.midRangeShot ?? 0, a.threePointShot ?? 0, a.closeShot ?? 0)
-  const bestDef = Math.max(a.perimeterDefense ?? 0, a.interiorDefense ?? 0)
-  const playmakingAvg = ((a.ballHandle ?? 0) + (a.passAccuracy ?? 0)) / 2
-  if (bestShooting >= 88) tags.push({ label: 'SCORER', color: '#f97316' })
-  if (bestDef >= 90) tags.push({ label: 'LOCKDOWN', color: '#3b82f6' })
-  if (playmakingAvg >= 88) tags.push({ label: 'PLAYMAKER', color: '#06b6d4' })
-  if ((a.speed ?? 0) >= 92) tags.push({ label: 'SPEED', color: '#22c55e' })
-  return tags.slice(0, 2)
-}
-
 function computeMatchupScore(myRoster, oppRoster) {
   const PERIM = ['PG', 'SG', 'SF']
   const withAttrs = r => r.filter(p => p.attributes)
@@ -220,9 +206,6 @@ function PlayerCard({ player, teamName }) {
               {overall}
             </span>
           )}
-          {getTrendTags(player).map((tag, i) => (
-            <span key={i} className="trend-tag" style={{ color: tag.color, borderColor: tag.color }}>{tag.label}</span>
-          ))}
         </span>
         <span className="expand-arrow">{expanded ? '▲' : '▼'}</span>
       </button>
@@ -333,6 +316,7 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
   const [gamePlan, setGamePlan] = useState(null)
   const [planLoading, setPlanLoading] = useState(false)
   const [planError, setPlanError] = useState(null)
+  const [activeTab, setActiveTab] = useState('scouting')
 
   const PERIMETER = ['PG', 'SG', 'SF']
   const BIGS = ['C', 'PF']
@@ -481,174 +465,250 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
     }
   }
 
+  // Lineup combinations
+  const withAttrs = myRoster.filter(p => p.attributes)
+  const isBigP = p => (p.positions || []).some(pos => BIGS.includes(pos))
+
+  const closingLineup = [...withAttrs]
+    .sort((a, b) => ((b.attributes.shotIQ??0) + (b.attributes.offensiveConsistency??0) + (b.overall??0)*0.5) -
+                    ((a.attributes.shotIQ??0) + (a.attributes.offensiveConsistency??0) + (a.overall??0)*0.5))
+    .slice(0, 5)
+
+  const paceLineup = [...withAttrs]
+    .sort((a, b) => ((b.attributes.speed??0) + (b.attributes.threePointShot??0)*1.2) -
+                    ((a.attributes.speed??0) + (a.attributes.threePointShot??0)*1.2))
+    .slice(0, 5)
+
+  const lockdownLineup = [...withAttrs]
+    .sort((a, b) => ((b.attributes.perimeterDefense??0) + (b.attributes.interiorDefense??0) + (b.attributes.steal??0) + (b.attributes.block??0)) -
+                    ((a.attributes.perimeterDefense??0) + (a.attributes.interiorDefense??0) + (a.attributes.steal??0) + (a.attributes.block??0)))
+    .slice(0, 5)
+
+  const bigPool = [...withAttrs].filter(isBigP).sort((a, b) => (b.overall??0) - (a.overall??0)).slice(0, 2)
+  const bigNames = new Set(bigPool.map(p => p.name))
+  const twinTowersLineup = [...bigPool, ...[...withAttrs].filter(p => !bigNames.has(p.name)).sort((a, b) => (b.overall??0) - (a.overall??0)).slice(0, 3)]
+
+  const lineups = [
+    { name: 'Closing Lineup', desc: 'High-IQ players for tight fourth-quarter situations', players: closingLineup,
+      getStat: p => ({ label: 'Shot IQ', val: p.attributes.shotIQ ?? '—' }) },
+    { name: 'Pace & Space', desc: 'Push tempo and stretch the floor with speed and shooting', players: paceLineup,
+      getStat: p => ({ label: 'Speed', val: p.attributes.speed ?? '—' }) },
+    { name: 'Lockdown', desc: 'Maximum defensive pressure across all positions', players: lockdownLineup,
+      getStat: p => ({ label: isBigP(p) ? 'Int. Def' : 'Per. Def', val: (isBigP(p) ? p.attributes.interiorDefense : p.attributes.perimeterDefense) ?? '—' }) },
+    { name: 'Twin Towers', desc: 'Two bigs for interior dominance and paint presence', players: twinTowersLineup,
+      getStat: p => ({ label: isBigP(p) ? 'Int. Def' : 'Speed', val: (isBigP(p) ? p.attributes.interiorDefense : p.attributes.speed) ?? '—' }) },
+  ]
+
+  const score = computeMatchupScore(myRoster, opponentRoster)
+  const TABS = [
+    { id: 'scouting', label: 'Scouting' },
+    { id: 'matchups', label: 'Matchups' },
+    { id: 'lineups', label: 'Lineups' },
+    { id: 'ai-plan', label: 'AI Plan' },
+  ]
+
   return (
     <div className="matchup-analyzer">
       <h2 className="analyzer-title">Matchup Analyzer</h2>
       <p className="analyzer-subtitle">{myTeam} vs {opponentTeam}</p>
 
-      {!planLoading && !gamePlan && (
-        <button className="analyze-btn ai-plan-btn" onClick={getAIGamePlan}>Get AI Game Plan</button>
-      )}
-      {planLoading && <div className="loading">Generating game plan…</div>}
-      {planError && <div className="api-error">AI error: {planError}</div>}
-      {gamePlan && (
-        <div className="game-plan">
-          <div className="game-plan-title">AI Game Plan</div>
-          <p className="game-plan-text">{gamePlan}</p>
-          <button className="analyze-btn ai-plan-btn ai-plan-regen" onClick={getAIGamePlan}>Regenerate</button>
+      <div className="matchup-score-card">
+        <div className="matchup-score-left">
+          <div className="matchup-grade" style={{ color: score.gradeColor }}>{score.grade}</div>
+          <div className="matchup-summary">{score.summary}</div>
         </div>
-      )}
-
-      {(() => {
-        const score = computeMatchupScore(myRoster, opponentRoster)
-        return (
-          <div className="matchup-score-card">
-            <div className="matchup-score-left">
-              <div className="matchup-grade" style={{ color: score.gradeColor }}>{score.grade}</div>
-              <div className="matchup-summary">{score.summary}</div>
-            </div>
-            <div className="matchup-score-dims">
-              {score.dimensions.map((d, i) => (
-                <div key={i} className="score-dim">
-                  <div className="score-dim-label">{d.label}</div>
-                  <div className="score-dim-bar">
-                    <div className="score-dim-fill" style={{ width: `${d.score}%`, background: d.score >= 55 ? '#22c55e' : d.score >= 45 ? '#eab308' : '#ef4444' }} />
-                  </div>
-                  <div className="score-dim-val" style={{ color: d.score >= 55 ? '#22c55e' : d.score >= 45 ? '#eab308' : '#ef4444' }}>{d.score}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )
-      })()}
-
-      <div className="analysis-grid">
-        <div className="analysis-card">
-          <div className="analysis-card-title">Attack Offensively</div>
-          <p className="analysis-hint">Weakest defenders on {opponentTeam}</p>
-          {attackTargets.length === 0 && <p className="no-data">Insufficient data</p>}
-          {attackTargets.map((p, i) => (
-            <div key={i} className="analysis-row">
-              <span className="analysis-name">{p.name}</span>
-              <span className="analysis-stats">
-                <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
-                {' / '}
-                <span style={{ color: getRatingColor(p.interior) }}>Int. Def {p.interior}</span>
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="analysis-card">
-          <div className="analysis-card-title">Hide Defensively</div>
-          <p className="analysis-hint">Weakest perimeter defenders on {myTeam}</p>
-          {hideTargets.length === 0 && <p className="no-data">Insufficient data</p>}
-          {hideTargets.map((p, i) => (
-            <div key={i} className="analysis-row">
-              <span className="analysis-name">{p.name}</span>
-              <span className="analysis-stats">
-                <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="analysis-card">
-          <div className="analysis-card-title">Leave Open</div>
-          <p className="analysis-hint">Worst shooters on {opponentTeam} — sag off to help</p>
-          {leaveOpen.length === 0 && <p className="no-data">Insufficient data</p>}
-          {leaveOpen.map((p, i) => (
-            <div key={i} className="analysis-row">
-              <span className="analysis-name">{p.name}</span>
-              <span className="analysis-stats">
-                <span style={{ color: getRatingColor(p.three) }}>Three-Point {p.three}</span>
-                {' / '}
-                <span style={{ color: getRatingColor(p.mid) }}>Mid-Range {p.mid}</span>
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="analysis-card">
-          <div className="analysis-card-title">Speed Advantage</div>
-          <p className="analysis-hint">Your guards/wings who significantly outrun their matchup</p>
-          {speedAdvantage.length === 0 && <p className="no-data">No major speed mismatches</p>}
-          {speedAdvantage.map((m, i) => (
-            <div key={i} className="analysis-row">
-              <div className="matchup-pair">
-                <span className="matchup-threat">
-                  {m.myPlayer}
-                  <span style={{ color: getRatingColor(m.mySpeed), marginLeft: 6, fontSize: 12 }}>Speed {m.mySpeed}</span>
-                </span>
-                <span className="matchup-arrow">vs</span>
-                <span className="matchup-defender">
-                  {m.oppPlayer}
-                  <span style={{ color: getRatingColor(m.oppSpeed), marginLeft: 6, fontSize: 12 }}>Speed {m.oppSpeed}</span>
-                </span>
+        <div className="matchup-score-dims">
+          {score.dimensions.map((d, i) => (
+            <div key={i} className="score-dim">
+              <div className="score-dim-label">{d.label}</div>
+              <div className="score-dim-bar">
+                <div className="score-dim-fill" style={{ width: `${d.score}%`, background: d.score >= 55 ? '#22c55e' : d.score >= 45 ? '#eab308' : '#ef4444' }} />
               </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="analysis-card">
-          <div className="analysis-card-title">Clutch Players</div>
-          <p className="analysis-hint">Highest Shot IQ + Offensive Consistency — go-to players in tight moments</p>
-          {clutchPlayers.map((p, i) => (
-            <div key={i} className="analysis-row">
-              <span className="analysis-name">{p.name}</span>
-              <span className="analysis-stats">
-                <span style={{ color: getRatingColor(p.shotIQ) }}>Shot IQ {p.shotIQ}</span>
-                {' / '}
-                <span style={{ color: getRatingColor(p.offCon) }}>Off. Con {p.offCon}</span>
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="analysis-card analysis-card--matchups">
-          <div className="analysis-card-title">Best Matchups</div>
-          <p className="analysis-hint">Your best positional defender for each of {opponentTeam}'s top players</p>
-          {bestMatchups.map((m, i) => (
-            <div key={i} className="analysis-row">
-              <div className="matchup-pair">
-                <span className="matchup-threat">
-                  <span className="player-pos" style={{ marginRight: 6 }}>{m.threatPos}</span>
-                  {m.threat}
-                  <span style={{ color: getRatingColor(m.threatOverall), marginLeft: 6, fontWeight: 700 }}>{m.threatOverall}</span>
-                </span>
-                <span className="matchup-arrow">→</span>
-                <span className="matchup-defender">
-                  {m.defender}
-                  <span style={{ color: getRatingColor(m.defValue), marginLeft: 6, fontSize: 12 }}>{m.statLabel} {m.defValue}</span>
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="analysis-card analysis-card--badges">
-          <div className="analysis-card-title">My Team's Best Badges</div>
-          {myTopPlayers.map((p, i) => (
-            <div key={i} className="badge-player-row">
-              <div className="badge-player-name">
-                <span style={{ color: getRatingColor(p.overall) }}>{p.overall}</span>
-                {' '}{p.name}
-              </div>
-              {p.badges.length > 0 ? (
-                <div className="badge-player-chips">
-                  {p.badges.map((b, j) => (
-                    <span key={j} className="badge-chip small" style={{ borderColor: getBadgeTierColor(b.tier), color: getBadgeTierColor(b.tier) }}>
-                      {b.name} · {getBadgeTierLabel(b.tier)}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <span className="no-data">No Legendary/HoF/Gold badges</span>
-              )}
+              <div className="score-dim-val" style={{ color: d.score >= 55 ? '#22c55e' : d.score >= 45 ? '#eab308' : '#ef4444' }}>{d.score}</div>
             </div>
           ))}
         </div>
       </div>
+
+      <div className="analyzer-tabs">
+        {TABS.map(tab => (
+          <button key={tab.id} className={`analyzer-tab${activeTab === tab.id ? ' active' : ''}`} onClick={() => setActiveTab(tab.id)}>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'scouting' && (
+        <div className="analysis-grid">
+          <div className="analysis-card">
+            <div className="analysis-card-title">Attack Offensively</div>
+            <p className="analysis-hint">Weakest defenders on {opponentTeam}</p>
+            {attackTargets.length === 0 && <p className="no-data">Insufficient data</p>}
+            {attackTargets.map((p, i) => (
+              <div key={i} className="analysis-row">
+                <span className="analysis-name">{p.name}</span>
+                <span className="analysis-stats">
+                  <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
+                  {' / '}
+                  <span style={{ color: getRatingColor(p.interior) }}>Int. Def {p.interior}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="analysis-card">
+            <div className="analysis-card-title">Hide Defensively</div>
+            <p className="analysis-hint">Weakest perimeter defenders on {myTeam}</p>
+            {hideTargets.length === 0 && <p className="no-data">Insufficient data</p>}
+            {hideTargets.map((p, i) => (
+              <div key={i} className="analysis-row">
+                <span className="analysis-name">{p.name}</span>
+                <span className="analysis-stats">
+                  <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="analysis-card">
+            <div className="analysis-card-title">Leave Open</div>
+            <p className="analysis-hint">Worst shooters on {opponentTeam} — sag off to help</p>
+            {leaveOpen.length === 0 && <p className="no-data">Insufficient data</p>}
+            {leaveOpen.map((p, i) => (
+              <div key={i} className="analysis-row">
+                <span className="analysis-name">{p.name}</span>
+                <span className="analysis-stats">
+                  <span style={{ color: getRatingColor(p.three) }}>Three-Point {p.three}</span>
+                  {' / '}
+                  <span style={{ color: getRatingColor(p.mid) }}>Mid-Range {p.mid}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="analysis-card">
+            <div className="analysis-card-title">Speed Advantage</div>
+            <p className="analysis-hint">Your guards/wings who significantly outrun their matchup</p>
+            {speedAdvantage.length === 0 && <p className="no-data">No major speed mismatches</p>}
+            {speedAdvantage.map((m, i) => (
+              <div key={i} className="analysis-row">
+                <div className="matchup-pair">
+                  <span className="matchup-threat">
+                    {m.myPlayer}
+                    <span style={{ color: getRatingColor(m.mySpeed), marginLeft: 6, fontSize: 12 }}>Speed {m.mySpeed}</span>
+                  </span>
+                  <span className="matchup-arrow">vs</span>
+                  <span className="matchup-defender">
+                    {m.oppPlayer}
+                    <span style={{ color: getRatingColor(m.oppSpeed), marginLeft: 6, fontSize: 12 }}>Speed {m.oppSpeed}</span>
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="analysis-card">
+            <div className="analysis-card-title">Clutch Players</div>
+            <p className="analysis-hint">Highest Shot IQ + Offensive Consistency — go-to players in tight moments</p>
+            {clutchPlayers.map((p, i) => (
+              <div key={i} className="analysis-row">
+                <span className="analysis-name">{p.name}</span>
+                <span className="analysis-stats">
+                  <span style={{ color: getRatingColor(p.shotIQ) }}>Shot IQ {p.shotIQ}</span>
+                  {' / '}
+                  <span style={{ color: getRatingColor(p.offCon) }}>Off. Con {p.offCon}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'matchups' && (
+        <div className="analysis-grid">
+          <div className="analysis-card analysis-card--matchups">
+            <div className="analysis-card-title">Best Matchups</div>
+            <p className="analysis-hint">Your best positional defender for each of {opponentTeam}'s top players</p>
+            {bestMatchups.map((m, i) => (
+              <div key={i} className="analysis-row">
+                <div className="matchup-pair">
+                  <span className="matchup-threat">
+                    <span className="player-pos" style={{ marginRight: 6 }}>{m.threatPos}</span>
+                    {m.threat}
+                    <span style={{ color: getRatingColor(m.threatOverall), marginLeft: 6, fontWeight: 700 }}>{m.threatOverall}</span>
+                  </span>
+                  <span className="matchup-arrow">→</span>
+                  <span className="matchup-defender">
+                    {m.defender}
+                    <span style={{ color: getRatingColor(m.defValue), marginLeft: 6, fontSize: 12 }}>{m.statLabel} {m.defValue}</span>
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="analysis-card analysis-card--badges">
+            <div className="analysis-card-title">My Team's Best Badges</div>
+            {myTopPlayers.map((p, i) => (
+              <div key={i} className="badge-player-row">
+                <div className="badge-player-name">
+                  <span style={{ color: getRatingColor(p.overall) }}>{p.overall}</span>
+                  {' '}{p.name}
+                </div>
+                {p.badges.length > 0 ? (
+                  <div className="badge-player-chips">
+                    {p.badges.map((b, j) => (
+                      <span key={j} className="badge-chip small" style={{ borderColor: getBadgeTierColor(b.tier), color: getBadgeTierColor(b.tier) }}>
+                        {b.name} · {getBadgeTierLabel(b.tier)}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="no-data">No Legendary/HoF/Gold badges</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'lineups' && (
+        <div className="lineups-grid">
+          {lineups.map((lineup, i) => (
+            <div key={i} className="lineup-card">
+              <div className="lineup-card-title">{lineup.name}</div>
+              <p className="lineup-card-desc">{lineup.desc}</p>
+              {lineup.players.map((p, j) => {
+                const stat = lineup.getStat(p)
+                return (
+                  <div key={j} className="lineup-player-row">
+                    <span className="lineup-player-pos">{(p.positions||[])[0] || '—'}</span>
+                    <span className="lineup-player-name">{p.name}</span>
+                    <span className="lineup-player-stat" style={{ color: getRatingColor(stat.val) }}>{stat.label} {stat.val}</span>
+                  </div>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {activeTab === 'ai-plan' && (
+        <div className="ai-plan-tab">
+          {!planLoading && !gamePlan && (
+            <button className="analyze-btn ai-plan-btn" onClick={getAIGamePlan}>Get AI Game Plan</button>
+          )}
+          {planLoading && <div className="loading">Generating game plan…</div>}
+          {planError && <div className="api-error">AI error: {planError}</div>}
+          {gamePlan && (
+            <div className="game-plan">
+              <div className="game-plan-title">AI Game Plan</div>
+              <p className="game-plan-text">{gamePlan}</p>
+              <button className="analyze-btn ai-plan-regen" onClick={getAIGamePlan}>Regenerate</button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

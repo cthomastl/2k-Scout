@@ -402,6 +402,106 @@ body {
   .matchup-score-left { display: flex; align-items: center; gap: 12px; }
 }
 
+/* ── Analyzer tabs ── */
+.analyzer-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #1e2330;
+  padding-bottom: 0;
+}
+
+.analyzer-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+}
+
+.analyzer-tab:hover { color: #94a3b8; }
+.analyzer-tab.active { color: #f1f5f9; border-bottom-color: #3b82f6; }
+
+/* ── Lineups ── */
+.lineups-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 600px) {
+  .lineups-grid { grid-template-columns: 1fr; }
+}
+
+.lineup-card {
+  background: #0f172a;
+  border: 1px solid #1e2330;
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.lineup-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #f1f5f9;
+  margin-bottom: 4px;
+}
+
+.lineup-card-desc {
+  font-size: 11px;
+  color: #475569;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.lineup-player-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(30, 35, 48, 0.5);
+}
+
+.lineup-player-row:last-child { border-bottom: none; }
+
+.lineup-player-pos {
+  font-size: 10px;
+  color: #64748b;
+  background: #1e2330;
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  min-width: 24px;
+  text-align: center;
+}
+
+.lineup-player-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lineup-player-stat {
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.ai-plan-tab {
+  padding-top: 4px;
+}
+
 /* ── Matchup Analyzer ── */
 .matchup-analyzer {
   margin-top: 24px;

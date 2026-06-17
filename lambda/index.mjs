@@ -38,10 +38,12 @@ function buildPrompt({ myTeam, opponentTeam, attackTargets, hideTargets, leaveOp
 
 You are coaching a human player controlling ${myTeam} against ${opponentTeam}.
 
-MY TEAM — ${myTeam} (top players):
+IMPORTANT: Build your entire game plan around the STARTING FIVE only. Do not mention or suggest using bench players under any circumstance.
+
+MY STARTING FIVE — ${myTeam}:
 ${myRosterLines}
 
-OPPONENT — ${opponentTeam} (top players):
+OPPONENT'S STARTING FIVE — ${opponentTeam}:
 ${oppRosterLines}
 
 SCOUTING DATA:
