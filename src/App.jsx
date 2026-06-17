@@ -275,6 +275,9 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
 
   // Roster already contains attributes + badges — no second fetch needed
 
+  const PERIMETER = ['PG', 'SG', 'SF']
+  const isPerimeter = p => (p.positions || []).some(pos => PERIMETER.includes(pos))
+
   const attackTargets = [...opponentRoster]
     .filter(p => p.attributes)
     .map(p => ({
@@ -286,13 +289,13 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
     .slice(0, 3)
 
   const hideTargets = [...myRoster]
-    .filter(p => p.attributes)
+    .filter(p => p.attributes && isPerimeter(p))
     .map(p => ({ name: p.name, perim: p.attributes.perimeterDefense ?? 99 }))
     .sort((a, b) => a.perim - b.perim)
     .slice(0, 3)
 
   const leaveOpen = [...opponentRoster]
-    .filter(p => p.attributes)
+    .filter(p => p.attributes && isPerimeter(p))
     .map(p => ({
       name: p.name,
       three: p.attributes.threePointShot ?? 99,
