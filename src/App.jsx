@@ -311,8 +311,15 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
   const isPerimeter = p => (p.positions || []).some(pos => PERIMETER.includes(pos))
   const isBig = p => (p.positions || []).some(pos => BIGS.includes(pos))
 
-  const attackTargets = [...opponentRoster]
+  const topN = (roster, n = 5) => [...roster]
     .filter(p => p.attributes)
+    .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
+    .slice(0, n)
+
+  const myStarters = topN(myRoster)
+  const oppStarters = topN(opponentRoster)
+
+  const attackTargets = oppStarters
     .map(p => {
       const pos = p.positions || []
       const isB = pos.some(pp => BIGS.includes(pp))
@@ -331,14 +338,14 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
     .sort((a, b) => (a.perim + a.interior) - (b.perim + b.interior))
     .slice(0, 3)
 
-  const hideTargets = [...myRoster]
-    .filter(p => p.attributes && isPerimeter(p))
+  const hideTargets = myStarters
+    .filter(p => isPerimeter(p))
     .map(p => ({ name: p.name, archetype: p.archetype, perim: p.attributes.perimeterDefense ?? 99 }))
     .sort((a, b) => a.perim - b.perim)
     .slice(0, 3)
 
-  const leaveOpen = [...opponentRoster]
-    .filter(p => p.attributes && isPerimeter(p))
+  const leaveOpen = oppStarters
+    .filter(p => isPerimeter(p))
     .map(p => ({
       name: p.name,
       archetype: p.archetype,
@@ -349,12 +356,12 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
     .sort((a, b) => (a.three + a.mid) - (b.three + b.mid))
     .slice(0, 3)
 
-  const speedAdvantage = [...myRoster]
-    .filter(p => p.attributes && isPerimeter(p))
+  const speedAdvantage = myStarters
+    .filter(p => isPerimeter(p))
     .map(myP => {
       const oppPos = myP.positions || []
-      const oppMatch = [...opponentRoster]
-        .filter(p => p.attributes && (p.positions || []).some(pos => oppPos.includes(pos)))
+      const oppMatch = oppStarters
+        .filter(p => (p.positions || []).some(pos => oppPos.includes(pos)))
         .sort((a, b) => (a.attributes.speed ?? 0) - (b.attributes.speed ?? 0))[0]
       if (!oppMatch) return null
       const diff = (myP.attributes.speed ?? 0) - (oppMatch.attributes.speed ?? 0)
@@ -370,8 +377,7 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
     .sort((a, b) => b.diff - a.diff)
     .slice(0, 3)
 
-  const clutchPlayers = [...myRoster]
-    .filter(p => p.attributes)
+  const clutchPlayers = myStarters
     .map(p => ({
       name: p.name,
       overall: p.overall,
@@ -396,9 +402,7 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
     }))
 
   const bestMatchups = (() => {
-    const threats = [...opponentRoster]
-      .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
-      .slice(0, 5)
+    const threats = oppStarters
     const usedDefenders = new Set()
     return threats.map(threat => {
       const oppPos = threat.positions || []
@@ -409,8 +413,8 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
       const defStat = big ? 'interiorDefense' : 'perimeterDefense'
       const statLabel = big ? 'Interior Defense' : 'Perimeter Defense'
 
-      const samePos = myRoster.filter(p => p.attributes && !usedDefenders.has(p.name) && (p.positions || []).some(pos => oppPos.includes(pos)))
-      const pool = samePos.length > 0 ? samePos : myRoster.filter(p => p.attributes && !usedDefenders.has(p.name))
+      const samePos = myStarters.filter(p => !usedDefenders.has(p.name) && (p.positions || []).some(pos => oppPos.includes(pos)))
+      const pool = samePos.length > 0 ? samePos : myStarters.filter(p => !usedDefenders.has(p.name))
       const defender = [...pool].sort((a, b) => (b.attributes[defStat] ?? 0) - (a.attributes[defStat] ?? 0))[0]
       if (defender) usedDefenders.add(defender.name)
 
