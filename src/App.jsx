@@ -360,7 +360,10 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
     const usedDefenders = new Set()
     return threats.map(threat => {
       const oppPos = threat.positions || []
-      const big = oppPos.some(p => BIGS.includes(p))
+      const isBig = oppPos.some(p => BIGS.includes(p))
+      // Stretch bigs (PF/C with 3PT ≥ 78) need a perimeter defender, not a shot blocker
+      const isStretchBig = isBig && (threat.attributes?.threePointShot ?? 0) >= 78
+      const big = isBig && !isStretchBig
       const defStat = big ? 'interiorDefense' : 'perimeterDefense'
       const statLabel = big ? 'Interior Defense' : 'Perimeter Defense'
 
