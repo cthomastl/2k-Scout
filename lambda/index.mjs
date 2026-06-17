@@ -85,10 +85,11 @@ Post Defense: Behind = guard behind post player (weak, gives easy catch), Three-
 
 COACHING RULES:
 1. For attack targets: follow the attackHint exactly — do NOT suggest driving at a big with low PD, suggest pulling them OUT to the perimeter instead. Only suggest driving/posting when the attackHint says so.
-2. For hide matchups: pair each of my weak defenders with one of their poor shooters by name so they can sag and help.
-3. For speed mismatches: name the specific in-game action (push transition, backdoor cut, blow-by on wing).
-4. For defensive settings: pick specific values for On-Ball Pressure, Screen Defense, Hedge, Double Team Post, and Drive Help based on this specific matchup. Give a one-line reason for each.
-5. Every sentence must name a player and a specific action. No generic advice.
+2. For hide matchups: each hidden defender has ONE assignment for the entire game — their designated poor shooter. Do not give them any secondary assignments, rotations, or mention them covering any other player anywhere in the game plan.
+3. A player listed in "leave open" means their 3PT and mid-range are both genuinely poor (below 78/80). Do not describe leaving someone open if their shooting stats are not in this list.
+4. For speed mismatches: name the specific in-game action (push transition, backdoor cut, blow-by on wing).
+5. For defensive settings: pick specific values for On-Ball Pressure, Screen Defense, Hedge, Double Team Post, and Drive Help based on this specific matchup. Give a one-line reason for each.
+6. Every sentence must name a player and a specific action. No generic advice.
 
 Write 5 focused sections: Offensive Plan, Defensive Assignments, Speed and Transition, Key In-Game Adjustments, Recommended Defensive Settings. Under 550 words. Plain text only.`
 }
