@@ -823,3 +823,157 @@ body {
   color: #475569;
   font-style: italic;
 }
+
+/* ── App-level navigation tabs ── */
+.app-nav {
+  display: flex;
+  gap: 4px;
+  padding: 16px 16px 0;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.app-nav-tab {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 10px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  letter-spacing: 0.02em;
+}
+
+.app-nav-tab:hover {
+  color: #94a3b8;
+}
+
+.app-nav-tab.active {
+  color: #f8fafc;
+  border-bottom-color: #3b82f6;
+}
+
+/* ── Team Rankings ── */
+.team-rankings {
+  max-width: 1200px;
+  margin: 24px auto;
+  padding: 0 16px 40px;
+}
+
+.rankings-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0 0 4px;
+}
+
+.rankings-subtitle {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0 0 24px;
+}
+
+.rankings-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding-top: 16px;
+}
+
+.progress-bar-wrap {
+  width: 260px;
+  height: 4px;
+  background: #1e293b;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: #3b82f6;
+  border-radius: 2px;
+  transition: width 0.2s ease;
+}
+
+.rankings-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .rankings-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .rankings-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ranking-category {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.ranking-category-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #1e293b;
+}
+
+.ranking-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid #0f1929;
+  font-size: 13px;
+}
+
+.ranking-row:last-child {
+  border-bottom: none;
+}
+
+.rank-num {
+  width: 20px;
+  text-align: right;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.rank-num:first-child:nth-last-child(n+1) {
+  color: #f59e0b; /* gold for #1 — overridden below */
+}
+
+.ranking-row:nth-child(2) .rank-num { color: #f59e0b; }
+.ranking-row:nth-child(3) .rank-num { color: #94a3b8; }
+.ranking-row:nth-child(4) .rank-num { color: #b45309; }
+
+.rank-team {
+  flex: 1;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rank-val {
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}

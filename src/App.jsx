@@ -40,6 +40,9 @@ function getBadgeTierLabel(tier) {
   return tier.charAt(0).toUpperCase() + tier.slice(1)
 }
 
+const PERIMETER = ['PG', 'SG', 'SF']
+const BIGS = ['C', 'PF']
+
 function computeMatchupEdges(myRoster, oppRoster) {
   const PERIM = ['PG', 'SG', 'SF']
   const BIGS  = ['C', 'PF']
@@ -305,8 +308,6 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
   const [activeTab, setActiveTab] = useState('scouting')
   const [opponentStrategy, setOpponentStrategy] = useState('')
 
-  const PERIMETER = ['PG', 'SG', 'SF']
-  const BIGS = ['C', 'PF']
   const isPerimeter = p => (p.positions || []).some(pos => PERIMETER.includes(pos))
   const isBig = p => (p.positions || []).some(pos => BIGS.includes(pos))
 
@@ -748,7 +749,128 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
   )
 }
 
+function TeamRankings({ teams, teamsLoading }) {
+  const [rosterMap, setRosterMap] = useState(null)
+  const [progress, setProgress] = useState({ done: 0, total: 0 })
+  const [fetchStarted, setFetchStarted] = useState(false)
+
+  useEffect(() => {
+    if (fetchStarted || teamsLoading || teams.length === 0) return
+    setFetchStarted(true)
+    const total = teams.length
+    setProgress({ done: 0, total })
+    const results = {}
+    const BATCH = 6
+    ;(async () => {
+      for (let i = 0; i < teams.length; i += BATCH) {
+        await Promise.all(teams.slice(i, i + BATCH).map(async t => {
+          try {
+            const data = await apiFetch(`/api/teams/${encodeURIComponent(t.teamName)}/roster?teamType=allt`)
+            results[t.teamName] = Array.isArray(data) ? data : data.data || data.roster || data.players || []
+          } catch {
+            results[t.teamName] = []
+          }
+          setProgress(p => ({ done: p.done + 1, total: p.total }))
+        }))
+      }
+      setRosterMap({ ...results })
+    })()
+  }, [teams, teamsLoading])
+
+  const isLoading = !rosterMap || progress.done < progress.total
+  const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0
+
+  const avgStat = (arr, fn) => {
+    const vals = arr.map(fn).filter(v => v > 0)
+    return vals.length ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : 0
+  }
+
+  const STAT_CATEGORIES = [
+    {
+      key: 'speed', label: 'Speed',
+      compute: roster => {
+        const pool = roster.filter(p => p.attributes && (p.positions||[]).some(pos => PERIMETER.includes(pos)))
+        return avgStat(pool, p => p.attributes.speed ?? 0)
+      },
+    },
+    {
+      key: 'perimDef', label: 'Perimeter Defense',
+      compute: roster => {
+        const pool = roster.filter(p => p.attributes && (p.positions||[]).some(pos => PERIMETER.includes(pos)))
+        return avgStat(pool, p => p.attributes.perimeterDefense ?? 0)
+      },
+    },
+    {
+      key: 'intDef', label: 'Interior Defense',
+      compute: roster => {
+        const pool = roster.filter(p => p.attributes && (p.positions||[]).some(pos => BIGS.includes(pos)))
+        return avgStat(pool.length ? pool : roster.filter(p => p.attributes), p => p.attributes.interiorDefense ?? 0)
+      },
+    },
+    {
+      key: 'three', label: '3PT Shooting',
+      compute: roster => {
+        const pool = roster.filter(p => p.attributes && (p.positions||[]).some(pos => PERIMETER.includes(pos)))
+        return avgStat(pool, p => p.attributes.threePointShot ?? 0)
+      },
+    },
+    {
+      key: 'reb', label: 'Rebounding',
+      compute: roster => {
+        const pool = roster.filter(p => p.attributes)
+        return avgStat(pool, p => Math.round(((p.attributes.offensiveRebound ?? 0) + (p.attributes.defensiveRebound ?? 0)) / 2))
+      },
+    },
+  ]
+
+  const rankings = rosterMap
+    ? STAT_CATEGORIES.map(cat => ({
+        ...cat,
+        rows: Object.entries(rosterMap)
+          .map(([name, roster]) => ({ name, val: cat.compute(roster) }))
+          .filter(t => t.val > 0)
+          .sort((a, b) => b.val - a.val)
+          .slice(0, 10),
+      }))
+    : []
+
+  return (
+    <div className="team-rankings">
+      <h2 className="rankings-title">Team Rankings</h2>
+      <p className="rankings-subtitle">All-Time teams ranked by key stats</p>
+
+      {isLoading && (
+        <div className="rankings-loading">
+          <Spinner center label={`Loading rosters… ${progress.done} / ${progress.total}`} />
+          <div className="progress-bar-wrap">
+            <div className="progress-bar" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+      )}
+
+      {!isLoading && (
+        <div className="rankings-grid">
+          {rankings.map(cat => (
+            <div key={cat.key} className="ranking-category">
+              <div className="ranking-category-title">{cat.label}</div>
+              {cat.rows.map((t, i) => (
+                <div key={t.name} className="ranking-row">
+                  <span className="rank-num">{i + 1}</span>
+                  <span className="rank-team">{t.name}</span>
+                  <span className="rank-val" style={{ color: getRatingColor(t.val) }}>{t.val}</span>
+                </div>
+              ))}
+              {cat.rows.length === 0 && <p className="no-data">No data</p>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function App() {
+  const [appTab, setAppTab] = useState('scout')
   const [teams, setTeams] = useState([])
   const [teamsLoading, setTeamsLoading] = useState(true)
   const [teamsError, setTeamsError] = useState(null)
@@ -810,39 +932,52 @@ export default function App() {
         <p className="app-subtitle">Pre-game scouting for NBA 2K All-Time teams</p>
       </header>
 
-      {teamsLoading && <Spinner center label="Loading teams…" />}
-      {teamsError && <div className="api-error center-loading">Failed to load teams: {teamsError}</div>}
+      <div className="app-nav">
+        <button className={`app-nav-tab${appTab === 'scout' ? ' active' : ''}`} onClick={() => setAppTab('scout')}>Scout</button>
+        <button className={`app-nav-tab${appTab === 'rankings' ? ' active' : ''}`} onClick={() => setAppTab('rankings')}>Team Rankings</button>
+      </div>
 
-      {!teamsLoading && (
-        <div className="panels-container">
-          <TeamPanel
-            side="my"
-            selectedTeam={myTeam}
-            onTeamChange={handleMyTeamChange}
-            teams={teams}
-            roster={myRoster}
-            loading={myRosterLoading}
-            error={myRosterError}
-          />
-          <TeamPanel
-            side="opp"
-            selectedTeam={oppTeam}
-            onTeamChange={handleOppTeamChange}
-            teams={teams}
-            roster={oppRoster}
-            loading={oppRosterLoading}
-            error={oppRosterError}
-          />
-        </div>
+      {appTab === 'scout' && (
+        <>
+          {teamsLoading && <Spinner center label="Loading teams…" />}
+          {teamsError && <div className="api-error center-loading">Failed to load teams: {teamsError}</div>}
+
+          {!teamsLoading && (
+            <div className="panels-container">
+              <TeamPanel
+                side="my"
+                selectedTeam={myTeam}
+                onTeamChange={handleMyTeamChange}
+                teams={teams}
+                roster={myRoster}
+                loading={myRosterLoading}
+                error={myRosterError}
+              />
+              <TeamPanel
+                side="opp"
+                selectedTeam={oppTeam}
+                onTeamChange={handleOppTeamChange}
+                teams={teams}
+                roster={oppRoster}
+                loading={oppRosterLoading}
+                error={oppRosterError}
+              />
+            </div>
+          )}
+
+          {bothSelected && (
+            <MatchupAnalyzer
+              myRoster={myRoster}
+              myTeam={myTeam}
+              opponentRoster={oppRoster}
+              opponentTeam={oppTeam}
+            />
+          )}
+        </>
       )}
 
-      {bothSelected && (
-        <MatchupAnalyzer
-          myRoster={myRoster}
-          myTeam={myTeam}
-          opponentRoster={oppRoster}
-          opponentTeam={oppTeam}
-        />
+      {appTab === 'rankings' && (
+        <TeamRankings teams={teams} teamsLoading={teamsLoading} />
       )}
     </div>
   )
