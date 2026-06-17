@@ -316,6 +316,31 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
       ),
     }))
 
+  const BIGS = ['C', 'PF']
+  const bestMatchups = [...opponentRoster]
+    .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
+    .slice(0, 5)
+    .map(threat => {
+      const oppPos = threat.positions || []
+      const isBig = oppPos.some(p => BIGS.includes(p))
+      const defStat = isBig ? 'interiorDefense' : 'perimeterDefense'
+      const statLabel = isBig ? 'ID' : 'PD'
+
+      const samePos = myRoster.filter(p => p.attributes && (p.positions || []).some(pos => oppPos.includes(pos)))
+      const pool = samePos.length > 0 ? samePos : myRoster.filter(p => p.attributes)
+      const defender = [...pool].sort((a, b) => (b.attributes[defStat] ?? 0) - (a.attributes[defStat] ?? 0))[0]
+
+      return defender ? {
+        threat: threat.name,
+        threatOverall: threat.overall,
+        threatPos: oppPos[0],
+        defender: defender.name,
+        defValue: defender.attributes[defStat] ?? '—',
+        statLabel,
+      } : null
+    })
+    .filter(Boolean)
+
   async function getAIGamePlan() {
     setPlanLoading(true)
     setPlanError(null)
@@ -400,6 +425,27 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
                 {' / '}
                 <span style={{ color: getRatingColor(p.mid) }}>MID {p.mid}</span>
               </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="analysis-card analysis-card--matchups">
+          <div className="analysis-card-title">Best Matchups</div>
+          <p className="analysis-hint">Your best positional defender for each of {opponentTeam}'s top players</p>
+          {bestMatchups.map((m, i) => (
+            <div key={i} className="analysis-row">
+              <div className="matchup-pair">
+                <span className="matchup-threat">
+                  <span className="player-pos" style={{ marginRight: 6 }}>{m.threatPos}</span>
+                  {m.threat}
+                  <span style={{ color: getRatingColor(m.threatOverall), marginLeft: 6, fontWeight: 700 }}>{m.threatOverall}</span>
+                </span>
+                <span className="matchup-arrow">→</span>
+                <span className="matchup-defender">
+                  {m.defender}
+                  <span style={{ color: getRatingColor(m.defValue), marginLeft: 6, fontSize: 12 }}>{m.statLabel} {m.defValue}</span>
+                </span>
+              </div>
             </div>
           ))}
         </div>
