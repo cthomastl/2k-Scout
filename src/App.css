@@ -355,26 +355,24 @@ body {
 
 .analysis-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 2fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 14px;
   margin-top: 16px;
+}
+
+.analysis-card--badges {
+  grid-column: 1 / -1;
 }
 
 @media (max-width: 800px) {
   .analysis-grid {
     grid-template-columns: 1fr 1fr;
   }
-  .analysis-card--badges {
-    grid-column: 1 / -1;
-  }
 }
 
 @media (max-width: 500px) {
   .analysis-grid {
     grid-template-columns: 1fr;
-  }
-  .analysis-card--badges {
-    grid-column: unset;
   }
 }
 
@@ -457,6 +455,26 @@ body {
 .badge-adv-player {
   font-size: 11px;
   color: #64748b;
+}
+
+.badge-player-row {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(30, 35, 48, 0.5);
+}
+
+.badge-player-row:last-child { border-bottom: none; }
+
+.badge-player-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f1f5f9;
+  margin-bottom: 6px;
+}
+
+.badge-player-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
 }
 
 /* ── AI Game Plan ── */

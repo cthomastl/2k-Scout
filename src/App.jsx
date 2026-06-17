@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
 
 const API_KEY = '2k_e55epjrp3x2oqtkam4ukk4yklystt5cb'
@@ -259,93 +259,59 @@ function findWeakLinks(roster, rosterDetails, statKey, label) {
   }))
 }
 
+function dedupeByName(list) {
+  const seen = new Set()
+  return (list || []).filter(b => {
+    if (seen.has(b.name)) return false
+    seen.add(b.name)
+    return true
+  })
+}
+
 function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
-  const [myDetails, setMyDetails] = useState({})
-  const [oppDetails, setOppDetails] = useState({})
-  const [loading, setLoading] = useState(false)
-  const [fetched, setFetched] = useState(false)
-  const [error, setError] = useState(null)
   const [gamePlan, setGamePlan] = useState(null)
   const [planLoading, setPlanLoading] = useState(false)
   const [planError, setPlanError] = useState(null)
 
-  const fetchAllDetails = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const fetchRoster = async (roster, teamName) => {
-        const results = {}
-        for (const player of roster) {
-          const slug = player.slug || player.name?.toLowerCase().replace(/\s+/g, '-')
-          try {
-            const res = await apiFetch(`/api/players/slug/${slug}?teamType=allt&team=${encodeURIComponent(teamName)}`)
-            results[slug] = res.data ?? res
-          } catch {
-            // skip failed players
-          }
-        }
-        return results
-      }
-      const [myD, oppD] = await Promise.all([
-        fetchRoster(myRoster, myTeam),
-        fetchRoster(opponentRoster, opponentTeam),
-      ])
-      setMyDetails(myD)
-      setOppDetails(oppD)
-      setFetched(true)
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
-    }
-  }, [myRoster, myTeam, opponentRoster, opponentTeam])
+  // Roster already contains attributes + badges — no second fetch needed
 
-  const myDetailsList = Object.values(myDetails)
-  const oppDetailsList = Object.values(oppDetails)
+  const attackTargets = [...opponentRoster]
+    .filter(p => p.attributes)
+    .map(p => ({
+      name: p.name,
+      perim: p.attributes.perimeterDefense ?? 99,
+      interior: p.attributes.interiorDefense ?? 99,
+    }))
+    .sort((a, b) => (a.perim + a.interior) - (b.perim + b.interior))
+    .slice(0, 3)
 
-  const attackTargets = oppDetailsList.length
-    ? [...oppDetailsList]
-        .filter(p => p.attributes)
-        .map(p => ({
-          name: p.name,
-          perim: p.attributes.perimeterDefense ?? 99,
-          interior: p.attributes.interiorDefense ?? 99,
-        }))
-        .sort((a, b) => (a.perim + a.interior) - (b.perim + b.interior))
-        .slice(0, 3)
-    : []
+  const hideTargets = [...myRoster]
+    .filter(p => p.attributes)
+    .map(p => ({ name: p.name, perim: p.attributes.perimeterDefense ?? 99 }))
+    .sort((a, b) => a.perim - b.perim)
+    .slice(0, 3)
 
-  const hideTargets = myDetailsList.length
-    ? [...myDetailsList]
-        .filter(p => p.attributes)
-        .map(p => ({ name: p.name, perim: p.attributes.perimeterDefense ?? 99 }))
-        .sort((a, b) => a.perim - b.perim)
-        .slice(0, 3)
-    : []
+  const leaveOpen = [...opponentRoster]
+    .filter(p => p.attributes)
+    .map(p => ({
+      name: p.name,
+      three: p.attributes.threePointShot ?? 99,
+      mid: p.attributes.midRangeShot ?? 99,
+    }))
+    .sort((a, b) => (a.three + a.mid) - (b.three + b.mid))
+    .slice(0, 3)
 
   const HOF_TIERS = ['legendary', 'hall of fame', 'gold']
-  function getHighBadges(detailsList) {
-    const result = {}
-    detailsList.forEach(p => {
-      const list = p.badges?.list
-      if (!Array.isArray(list)) return
-      const seen = new Set()
-      list.forEach(b => {
-        if (seen.has(b.name)) return
-        seen.add(b.name)
-        const tier = (b.tier || '').toLowerCase()
-        if (HOF_TIERS.some(t => tier.includes(t))) {
-          if (!result[b.name]) result[b.name] = { tier: b.tier, player: p.name }
-        }
-      })
-    })
-    return result
-  }
-
-  const myBadgeMap = getHighBadges(myDetailsList)
-  const oppBadgeMap = getHighBadges(oppDetailsList)
-  const myAdvantages = Object.entries(myBadgeMap).filter(([name]) => !oppBadgeMap[name])
-  const oppAdvantages = Object.entries(oppBadgeMap).filter(([name]) => !myBadgeMap[name])
+  const myTopPlayers = [...myRoster]
+    .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
+    .slice(0, 5)
+    .map(p => ({
+      name: p.name,
+      overall: p.overall,
+      badges: dedupeByName(p.badges?.list).filter(b =>
+        HOF_TIERS.some(t => (b.tier || '').toLowerCase().includes(t))
+      ),
+    }))
 
   async function getAIGamePlan() {
     setPlanLoading(true)
@@ -355,14 +321,7 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
       const res = await fetch(LAMBDA_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          myTeam,
-          opponentTeam,
-          attackTargets,
-          hideTargets,
-          myAdvantages,
-          oppAdvantages,
-        }),
+        body: JSON.stringify({ myTeam, opponentTeam, attackTargets, hideTargets, leaveOpen }),
       })
       if (!res.ok) throw new Error(`Lambda error ${res.status}`)
       const data = await res.json()
@@ -378,99 +337,93 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
   return (
     <div className="matchup-analyzer">
       <h2 className="analyzer-title">Matchup Analyzer</h2>
-      <p className="analyzer-subtitle">
-        {myTeam} vs {opponentTeam}
-      </p>
+      <p className="analyzer-subtitle">{myTeam} vs {opponentTeam}</p>
 
-      {!fetched && !loading && (
-        <button className="analyze-btn" onClick={fetchAllDetails}>
-          Run Full Analysis
-        </button>
-      )}
-
-      {loading && <div className="loading">Fetching full rosters for analysis…</div>}
-      {error && <div className="api-error">Error: {error}</div>}
-
-      {fetched && !planLoading && !gamePlan && (
+      {!planLoading && !gamePlan && (
         <button className="analyze-btn ai-plan-btn" onClick={getAIGamePlan}>
           Get AI Game Plan
         </button>
       )}
-
       {planLoading && <div className="loading">Generating game plan…</div>}
       {planError && <div className="api-error">AI error: {planError}</div>}
-
       {gamePlan && (
         <div className="game-plan">
           <div className="game-plan-title">AI Game Plan</div>
           <p className="game-plan-text">{gamePlan}</p>
-          <button className="analyze-btn ai-plan-btn ai-plan-regen" onClick={getAIGamePlan}>
-            Regenerate
-          </button>
+          <button className="analyze-btn ai-plan-btn ai-plan-regen" onClick={getAIGamePlan}>Regenerate</button>
         </div>
       )}
 
-      {fetched && (
-        <div className="analysis-grid">
-          <div className="analysis-card">
-            <div className="analysis-card-title">Attack Offensively</div>
-            <p className="analysis-hint">Lowest combined perimeter + interior defense on {opponentTeam}</p>
-            {attackTargets.length === 0 && <p className="no-data">Insufficient data</p>}
-            {attackTargets.map((p, i) => (
-              <div key={i} className="analysis-row">
-                <span className="analysis-name">{p.name}</span>
-                <span className="analysis-stats">
-                  <span style={{ color: getRatingColor(p.perim) }}>PD {p.perim}</span>
-                  {' / '}
-                  <span style={{ color: getRatingColor(p.interior) }}>ID {p.interior}</span>
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <div className="analysis-card">
-            <div className="analysis-card-title">Hide Defensively</div>
-            <p className="analysis-hint">Lowest perimeter defense on {myTeam} — keep away from ball handlers</p>
-            {hideTargets.length === 0 && <p className="no-data">Insufficient data</p>}
-            {hideTargets.map((p, i) => (
-              <div key={i} className="analysis-row">
-                <span className="analysis-name">{p.name}</span>
-                <span className="analysis-stats">
-                  <span style={{ color: getRatingColor(p.perim) }}>PD {p.perim}</span>
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <div className="analysis-card analysis-card--badges">
-            <div className="analysis-card-title">Badge Advantages</div>
-            <div className="badge-advantage-section">
-              <div className="badge-adv-label">{myTeam} has (opponent lacks):</div>
-              {myAdvantages.length === 0 && <p className="no-data">No exclusive HoF/Gold badges</p>}
-              {myAdvantages.map(([name, info], i) => (
-                <div key={i} className="badge-adv-row">
-                  <span className="badge-chip small" style={{ borderColor: getBadgeTierColor(info.tier), color: getBadgeTierColor(info.tier) }}>
-                    {name} · {getBadgeTierLabel(info.tier)}
-                  </span>
-                  <span className="badge-adv-player">{info.player}</span>
-                </div>
-              ))}
+      <div className="analysis-grid">
+        <div className="analysis-card">
+          <div className="analysis-card-title">Attack Offensively</div>
+          <p className="analysis-hint">Weakest defenders on {opponentTeam}</p>
+          {attackTargets.length === 0 && <p className="no-data">Insufficient data</p>}
+          {attackTargets.map((p, i) => (
+            <div key={i} className="analysis-row">
+              <span className="analysis-name">{p.name}</span>
+              <span className="analysis-stats">
+                <span style={{ color: getRatingColor(p.perim) }}>PD {p.perim}</span>
+                {' / '}
+                <span style={{ color: getRatingColor(p.interior) }}>ID {p.interior}</span>
+              </span>
             </div>
-            <div className="badge-advantage-section">
-              <div className="badge-adv-label">{opponentTeam} has (you lack):</div>
-              {oppAdvantages.length === 0 && <p className="no-data">No exclusive HoF/Gold badges</p>}
-              {oppAdvantages.map(([name, info], i) => (
-                <div key={i} className="badge-adv-row">
-                  <span className="badge-chip small" style={{ borderColor: getBadgeTierColor(info.tier), color: getBadgeTierColor(info.tier) }}>
-                    {name} · {getBadgeTierLabel(info.tier)}
-                  </span>
-                  <span className="badge-adv-player">{info.player}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
-      )}
+
+        <div className="analysis-card">
+          <div className="analysis-card-title">Hide Defensively</div>
+          <p className="analysis-hint">Weakest defenders on {myTeam} — keep off the ball</p>
+          {hideTargets.length === 0 && <p className="no-data">Insufficient data</p>}
+          {hideTargets.map((p, i) => (
+            <div key={i} className="analysis-row">
+              <span className="analysis-name">{p.name}</span>
+              <span className="analysis-stats">
+                <span style={{ color: getRatingColor(p.perim) }}>PD {p.perim}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="analysis-card">
+          <div className="analysis-card-title">Leave Open</div>
+          <p className="analysis-hint">Worst shooters on {opponentTeam} — sag off to help elsewhere</p>
+          {leaveOpen.length === 0 && <p className="no-data">Insufficient data</p>}
+          {leaveOpen.map((p, i) => (
+            <div key={i} className="analysis-row">
+              <span className="analysis-name">{p.name}</span>
+              <span className="analysis-stats">
+                <span style={{ color: getRatingColor(p.three) }}>3PT {p.three}</span>
+                {' / '}
+                <span style={{ color: getRatingColor(p.mid) }}>MID {p.mid}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="analysis-card analysis-card--badges">
+          <div className="analysis-card-title">My Team's Best Badges</div>
+          {myTopPlayers.map((p, i) => (
+            <div key={i} className="badge-player-row">
+              <div className="badge-player-name">
+                <span style={{ color: getRatingColor(p.overall) }}>{p.overall}</span>
+                {' '}{p.name}
+              </div>
+              {p.badges.length > 0 ? (
+                <div className="badge-player-chips">
+                  {p.badges.map((b, j) => (
+                    <span key={j} className="badge-chip small" style={{ borderColor: getBadgeTierColor(b.tier), color: getBadgeTierColor(b.tier) }}>
+                      {b.name} · {getBadgeTierLabel(b.tier)}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span className="no-data">No Legendary/HoF/Gold badges</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
