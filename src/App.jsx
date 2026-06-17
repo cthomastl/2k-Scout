@@ -562,15 +562,6 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
     </div>
   )
 }
-                <span className="no-data">No Legendary/HoF/Gold badges</span>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export default function App() {
   const [teams, setTeams] = useState([])
