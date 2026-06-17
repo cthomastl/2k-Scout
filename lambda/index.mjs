@@ -22,20 +22,26 @@ function buildPrompt({ myTeam, opponentTeam, attackTargets, hideTargets, leaveOp
     ? leaveOpen.map(p => `  - ${p.name} (3PT ${p.three} / MID ${p.mid})`).join('\n')
     : '  - No data available'
 
-  return `You are an expert NBA 2K strategist. Generate a concise, practical pre-game plan for playing ${myTeam} against ${opponentTeam} in NBA 2K.
+  return `You are an expert NBA 2K coach giving pre-game instructions to a human player controlling ${myTeam} against ${opponentTeam}.
 
 SCOUTING DATA:
 
-Opponent's defensive weaknesses — attack these players:
+${opponentTeam} defensive weaknesses (low PD = easy to score on in isolation):
 ${attackLines}
 
-My defensive liabilities — keep these players off the ball:
+${myTeam} defensive liabilities (low PD = get beaten off the dribble, exploit by opponent):
 ${hideLines}
 
-Opponent's poor shooters — sag off to help defend elsewhere:
+${opponentTeam} poor shooters (low 3PT + mid = safe to leave open, sag off for help defense):
 ${leaveLines}
 
-Write a game plan with 3 sections: Offensive Strategy, Defensive Strategy, and Key Adjustments. Be specific — name the players. Keep it under 350 words. Use plain text, no markdown headers.`
+IMPORTANT STRATEGY RULES — follow these exactly:
+- "Hide" means: pair each of MY weak defenders with one of THEIR poor shooters so MY weak defender can sag off and help on drives instead of being isolated. Name the specific pairing (e.g. "Guard [their poor shooter] with [my weak defender] so [my weak defender] can sag into the paint").
+- "Attack" means: run ISO plays or post-ups targeting the opponent's worst defenders. Name who to attack and what move to use (drive, post, mid pull-up).
+- Never suggest putting a weak offensive player in an isolation role.
+- Be tactical, specific, and concise. No generic advice.
+
+Write 3 short sections: Offensive Plan, Defensive Matchups, Key Adjustments. Under 300 words. Plain text only.`
 }
 
 export const handler = async (event) => {
