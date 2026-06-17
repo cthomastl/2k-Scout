@@ -358,7 +358,7 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
       three: p.attributes.threePointShot ?? 99,
       mid: p.attributes.midRangeShot ?? 99,
     }))
-    .filter(p => p.three < 78 && p.mid < 80)
+    .filter(p => p.three < 80)
     .sort((a, b) => (a.three + a.mid) - (b.three + b.mid))
     .slice(0, 3)
 
