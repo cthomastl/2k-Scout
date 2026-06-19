@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.github
+k8s
+services
+lambda
+*.log
+.env
+.env.*
+npm-debug.log*
+.DS_Store

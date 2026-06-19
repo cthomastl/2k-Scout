@@ -4,6 +4,12 @@ import './App.css'
 const API_KEY = import.meta.env.VITE_NBA2K_API_KEY ?? ''
 const BASE_URL = ''
 const LAMBDA_URL = import.meta.env.VITE_LAMBDA_URL ?? ''
+// In the Kubernetes deployment the ingress routes /api/gameplan to the AI service.
+// Fall back to the standalone Lambda URL when one is configured (legacy / local dev).
+const GAMEPLAN_URL = LAMBDA_URL || '/api/gameplan'
+const AUTH_BASE = import.meta.env.VITE_AUTH_BASE ?? '/auth'
+const DEMO_EMAIL = 'scout@2kscout.app'
+const DEMO_PASSWORD = 'scout2k'
 
 async function apiFetch(path) {
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -12,6 +18,26 @@ async function apiFetch(path) {
   if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`)
   return res.json()
 }
+
+/* ── Icons (inline SVG — no emoji) ── */
+const Icon = ({ path, size = 18, stroke = 1.7, fill = 'none' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke="currentColor"
+    strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {path}
+  </svg>
+)
+const IconDashboard = p => <Icon {...p} path={<><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></>} />
+const IconScout = p => <Icon {...p} path={<><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></>} />
+const IconRankings = p => <Icon {...p} path={<><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></>} />
+const IconSettings = p => <Icon {...p} path={<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>} />
+const IconLogout = p => <Icon {...p} path={<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></>} />
+const IconSun = p => <Icon {...p} path={<><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>} />
+const IconMoon = p => <Icon {...p} path={<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>} />
+const IconUsers = p => <Icon {...p} path={<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></>} />
+const IconTarget = p => <Icon {...p} path={<><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></>} />
+const IconBolt = p => <Icon {...p} path={<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>} />
+const IconShield = p => <Icon {...p} path={<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>} />
+const IconArrowRight = p => <Icon {...p} path={<><path d="M5 12h14M12 5l7 7-7 7"/></>} />
 
 function getRatingColor(val) {
   const n = parseInt(val, 10)
@@ -451,7 +477,7 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
         .slice(0, 5)
         .map(p => ({ name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions, badges: topBadges(p) }))
 
-      const res = await fetch(LAMBDA_URL, {
+      const res = await fetch(GAMEPLAN_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -873,8 +899,151 @@ function TeamRankings({ teams, teamsLoading }) {
   )
 }
 
+function useTheme() {
+  const [theme, setTheme] = useState(() => localStorage.getItem('2ks-theme') || 'light')
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem('2ks-theme', theme)
+  }, [theme])
+  const toggle = () => setTheme(t => (t === 'light' ? 'dark' : 'light'))
+  return [theme, toggle]
+}
+
+async function attemptLogin(email, password) {
+  try {
+    const res = await fetch(`${AUTH_BASE}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    if (res.ok) {
+      const d = await res.json()
+      return { token: d.token, user: d.user }
+    }
+    if (res.status === 401) return { error: 'Invalid email or password' }
+  } catch {
+    // network error — fall through to the local demo check below
+  }
+  // Demo fallback so the app stays usable without the auth service (local dev / legacy EC2)
+  if (email.trim().toLowerCase() === DEMO_EMAIL && password === DEMO_PASSWORD) {
+    return { token: 'demo-' + Date.now(), user: { email: DEMO_EMAIL, name: 'Scout' } }
+  }
+  return { error: 'Invalid email or password' }
+}
+
+function Login({ onLogin, theme, onToggleTheme }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  async function submit(e) {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    const res = await attemptLogin(email, password)
+    setBusy(false)
+    if (res.error) { setError(res.error); return }
+    onLogin(res.token, res.user)
+  }
+
+  return (
+    <div className="login-screen">
+      <button className="theme-toggle login-theme-toggle" onClick={onToggleTheme} title="Toggle theme">
+        {theme === 'light' ? <IconMoon /> : <IconSun />}
+      </button>
+      <form className="login-card" onSubmit={submit}>
+        <div className="login-brand">
+          <span className="brand-mark">2K</span>
+          <span className="brand-name">Scout</span>
+        </div>
+        <h1 className="login-title">Sign in</h1>
+        <p className="login-sub">Pre-game scouting for NBA 2K All-Time teams</p>
+
+        <label className="login-label">Email</label>
+        <input className="login-input" type="email" autoComplete="username"
+          value={email} onChange={e => setEmail(e.target.value)} placeholder="scout@2kscout.app" required />
+
+        <label className="login-label">Password</label>
+        <input className="login-input" type="password" autoComplete="current-password"
+          value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
+
+        {error && <div className="login-error">{error}</div>}
+
+        <button className="login-btn" type="submit" disabled={busy}>
+          {busy ? 'Signing in…' : 'Sign In'}
+        </button>
+
+        <div className="login-demo">
+          Demo access — <strong>{DEMO_EMAIL}</strong> / <strong>{DEMO_PASSWORD}</strong>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function StatCard({ icon, label, value, hint }) {
+  return (
+    <div className="dash-stat-card">
+      <div className="dash-stat-icon">{icon}</div>
+      <div className="dash-stat-value">{value}</div>
+      <div className="dash-stat-label">{label}</div>
+      {hint && <div className="dash-stat-hint">{hint}</div>}
+    </div>
+  )
+}
+
+function DashboardHome({ user, teams, teamsLoading, myTeam, oppTeam, onStart, onRankings }) {
+  const ready = myTeam && oppTeam
+  return (
+    <div className="dash-home">
+      <div className="dash-welcome">
+        <h2 className="dash-welcome-title">Welcome back, {user?.name || 'Scout'}</h2>
+        <p className="dash-welcome-sub">Scout any two All-Time rosters and build a game plan from pure 2K ratings.</p>
+      </div>
+
+      <div className="dash-stats-grid">
+        <StatCard icon={<IconUsers />} label="All-Time Teams" value={teamsLoading ? '—' : teams.length} hint="Available to scout" />
+        <StatCard icon={<IconTarget />} label="Current Matchup" value={ready ? 'Ready' : 'None'} hint={ready ? `${myTeam} vs ${oppTeam}` : 'Pick two teams to begin'} />
+        <StatCard icon={<IconRankings />} label="Ranking Categories" value="5" hint="Speed · Def · 3PT · Reb" />
+        <StatCard icon={<IconBolt />} label="AI Game Plans" value="On" hint="Powered by Claude" />
+      </div>
+
+      <div className="dash-cta-row">
+        <button className="dash-cta primary" onClick={onStart}>
+          <div>
+            <div className="dash-cta-title">Start a Matchup</div>
+            <div className="dash-cta-sub">Select your team and an opponent</div>
+          </div>
+          <IconArrowRight size={20} />
+        </button>
+        <button className="dash-cta" onClick={onRankings}>
+          <div>
+            <div className="dash-cta-title">Browse Team Rankings</div>
+            <div className="dash-cta-sub">League-wide stat leaderboards</div>
+          </div>
+          <IconArrowRight size={20} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const NAV_ITEMS = [
+  { id: 'dashboard', label: 'Dashboard', Icon: IconDashboard },
+  { id: 'scout', label: 'Scout', Icon: IconScout },
+  { id: 'rankings', label: 'Rankings', Icon: IconRankings },
+  { id: 'settings', label: 'Settings', Icon: IconSettings },
+]
+
 export default function App() {
-  const [appTab, setAppTab] = useState('scout')
+  const [theme, toggleTheme] = useTheme()
+  const [token, setToken] = useState(() => localStorage.getItem('2ks-token'))
+  const [user, setUser] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('2ks-user')) } catch { return null }
+  })
+  const [page, setPage] = useState('dashboard')
+
   const [teams, setTeams] = useState([])
   const [teamsLoading, setTeamsLoading] = useState(true)
   const [teamsError, setTeamsError] = useState(null)
@@ -890,15 +1059,30 @@ export default function App() {
   const [oppRosterError, setOppRosterError] = useState(null)
 
   useEffect(() => {
+    if (!token) return
     apiFetch('/api/teams?teamType=allt')
       .then(data => {
-        console.log('Teams response:', JSON.stringify(data, null, 2))
         const list = Array.isArray(data) ? data : data.data || data.teams || []
         setTeams(list)
       })
       .catch(e => setTeamsError(e.message))
       .finally(() => setTeamsLoading(false))
-  }, [])
+  }, [token])
+
+  function handleLogin(tok, usr) {
+    localStorage.setItem('2ks-token', tok)
+    localStorage.setItem('2ks-user', JSON.stringify(usr))
+    setToken(tok)
+    setUser(usr)
+    setPage('dashboard')
+  }
+
+  function handleLogout() {
+    localStorage.removeItem('2ks-token')
+    localStorage.removeItem('2ks-user')
+    setToken(null)
+    setUser(null)
+  }
 
   async function fetchRoster(teamName, setRoster, setLoading, setError) {
     if (!teamName) return
@@ -907,7 +1091,6 @@ export default function App() {
     setRoster([])
     try {
       const data = await apiFetch(`/api/teams/${encodeURIComponent(teamName)}/roster?teamType=allt`)
-      console.log(`Roster for ${teamName}:`, JSON.stringify(data, null, 2))
       const roster = Array.isArray(data) ? data : data.data || data.roster || data.players || []
       setRoster(roster)
     } catch (e) {
@@ -927,62 +1110,113 @@ export default function App() {
     fetchRoster(name, setOppRoster, setOppRosterLoading, setOppRosterError)
   }
 
+  if (!token) {
+    return <Login onLogin={handleLogin} theme={theme} onToggleTheme={toggleTheme} />
+  }
+
   const bothSelected = myTeam && oppTeam && myRoster.length > 0 && oppRoster.length > 0
+  const initials = (user?.name || user?.email || 'S').slice(0, 1).toUpperCase()
+  const pageTitle = NAV_ITEMS.find(n => n.id === page)?.label || 'Dashboard'
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1 className="app-title">2K Scout</h1>
-        <p className="app-subtitle">Pre-game scouting for NBA 2K All-Time teams</p>
-      </header>
+    <div className="layout">
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <span className="brand-mark">2K</span>
+          <span className="brand-name">Scout</span>
+        </div>
+        <nav className="sidebar-nav">
+          {NAV_ITEMS.map(({ id, label, Icon }) => (
+            <button key={id} className={`sidebar-link${page === id ? ' active' : ''}`} onClick={() => setPage(id)}>
+              <Icon /><span>{label}</span>
+            </button>
+          ))}
+        </nav>
+        <button className="sidebar-link sidebar-logout" onClick={handleLogout}>
+          <IconLogout /><span>Logout</span>
+        </button>
+      </aside>
 
-      <div className="app-nav">
-        <button className={`app-nav-tab${appTab === 'scout' ? ' active' : ''}`} onClick={() => setAppTab('scout')}>Scout</button>
-        <button className={`app-nav-tab${appTab === 'rankings' ? ' active' : ''}`} onClick={() => setAppTab('rankings')}>Team Rankings</button>
-      </div>
-
-      {appTab === 'scout' && (
-        <>
-          {teamsLoading && <Spinner center label="Loading teams…" />}
-          {teamsError && <div className="api-error center-loading">Failed to load teams: {teamsError}</div>}
-
-          {!teamsLoading && (
-            <div className="panels-container">
-              <TeamPanel
-                side="my"
-                selectedTeam={myTeam}
-                onTeamChange={handleMyTeamChange}
-                teams={teams}
-                roster={myRoster}
-                loading={myRosterLoading}
-                error={myRosterError}
-              />
-              <TeamPanel
-                side="opp"
-                selectedTeam={oppTeam}
-                onTeamChange={handleOppTeamChange}
-                teams={teams}
-                roster={oppRoster}
-                loading={oppRosterLoading}
-                error={oppRosterError}
-              />
+      <div className="main">
+        <header className="topbar">
+          <h1 className="topbar-title">{pageTitle}</h1>
+          <div className="topbar-actions">
+            <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
+              {theme === 'light' ? <IconMoon /> : <IconSun />}
+            </button>
+            <div className="topbar-user">
+              <span className="user-avatar">{initials}</span>
+              <span className="user-name">{user?.name || 'Scout'}</span>
             </div>
-          )}
+          </div>
+        </header>
 
-          {bothSelected && (
-            <MatchupAnalyzer
-              myRoster={myRoster}
+        <main className="content">
+          {page === 'dashboard' && (
+            <DashboardHome
+              user={user}
+              teams={teams}
+              teamsLoading={teamsLoading}
               myTeam={myTeam}
-              opponentRoster={oppRoster}
-              opponentTeam={oppTeam}
+              oppTeam={oppTeam}
+              onStart={() => setPage('scout')}
+              onRankings={() => setPage('rankings')}
             />
           )}
-        </>
-      )}
 
-      {appTab === 'rankings' && (
-        <TeamRankings teams={teams} teamsLoading={teamsLoading} />
-      )}
+          {page === 'scout' && (
+            <>
+              {teamsLoading && <Spinner center label="Loading teams…" />}
+              {teamsError && <div className="api-error center-loading">Failed to load teams: {teamsError}</div>}
+              {!teamsLoading && (
+                <div className="panels-container">
+                  <TeamPanel side="my" selectedTeam={myTeam} onTeamChange={handleMyTeamChange}
+                    teams={teams} roster={myRoster} loading={myRosterLoading} error={myRosterError} />
+                  <TeamPanel side="opp" selectedTeam={oppTeam} onTeamChange={handleOppTeamChange}
+                    teams={teams} roster={oppRoster} loading={oppRosterLoading} error={oppRosterError} />
+                </div>
+              )}
+              {bothSelected && (
+                <MatchupAnalyzer myRoster={myRoster} myTeam={myTeam}
+                  opponentRoster={oppRoster} opponentTeam={oppTeam} />
+              )}
+            </>
+          )}
+
+          {page === 'rankings' && (
+            <TeamRankings teams={teams} teamsLoading={teamsLoading} />
+          )}
+
+          {page === 'settings' && (
+            <div className="settings-page">
+              <div className="settings-card">
+                <div className="settings-card-title">Appearance</div>
+                <div className="settings-row">
+                  <div>
+                    <div className="settings-row-label">Theme</div>
+                    <div className="settings-row-hint">Switch between light and dark mode</div>
+                  </div>
+                  <button className="settings-theme-btn" onClick={toggleTheme}>
+                    {theme === 'light' ? <><IconMoon size={16} /> Dark</> : <><IconSun size={16} /> Light</>}
+                  </button>
+                </div>
+              </div>
+              <div className="settings-card">
+                <div className="settings-card-title">Account</div>
+                <div className="settings-row">
+                  <div>
+                    <div className="settings-row-label">{user?.name || 'Scout'}</div>
+                    <div className="settings-row-hint">{user?.email || DEMO_EMAIL}</div>
+                  </div>
+                  <button className="settings-logout-btn" onClick={handleLogout}>
+                    <IconLogout size={16} /> Logout
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   )
 }
