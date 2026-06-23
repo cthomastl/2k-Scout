@@ -1,7 +1,7 @@
-# CI/CD is handled by AWS CodePipeline.
+# CI/CD is handled by AWS CodePipeline triggered by AWS CodeCommit pushes.
 # See buildspec-build.yml, buildspec-docker.yml, and buildspec-deploy.yml.
 name: CI/CD
 
 on:
   push:
-    branches: []  # disabled — pipeline runs in CodePipeline
+    branches: []  # disabled — pipeline triggers on CodeCommit push via EventBridge
