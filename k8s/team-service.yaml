@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: team-service
-          image: ghcr.io/cthomastl/2k-scout-team-service:latest
+          image: ECR_REGISTRY/2k-scout-team-service:IMAGE_TAG
           ports:
             - containerPort: 3001
           env:

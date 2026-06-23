@@ -1,0 +1,51 @@
+version: 0.2
+
+# Stage 2: Build all five Docker images and push to ECR.
+# Required CodeBuild environment variables:
+#   AWS_ACCOUNT_ID  - your 12-digit AWS account ID
+#   AWS_REGION      - e.g. us-east-1
+# Required IAM permissions on the CodeBuild role:
+#   ecr:GetAuthorizationToken
+#   ecr:BatchCheckLayerAvailability
+#   ecr:CompleteLayerUpload
+#   ecr:InitiateLayerUpload
+#   ecr:PutImage
+#   ecr:UploadLayerPart
+env:
+  variables:
+    AWS_REGION: "us-east-1"
+
+phases:
+  pre_build:
+    commands:
+      - echo "Logging in to ECR..."
+      - export ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+      - export IMAGE_TAG=$CODEBUILD_RESOLVED_SOURCE_VERSION
+      - echo "Image tag is $IMAGE_TAG"
+  build:
+    commands:
+      - echo "Building and pushing images..."
+      - |
+        for svc in frontend gateway team-service ai-service auth-service; do
+          if [ "$svc" = "frontend" ]; then
+            CTX="."
+            DFILE="Dockerfile.frontend"
+          else
+            CTX="services/$svc"
+            DFILE="services/$svc/Dockerfile"
+          fi
+          echo "--- Building $svc ---"
+          docker build -t $ECR_REGISTRY/2k-scout-$svc:$IMAGE_TAG -f $DFILE $CTX
+          docker push $ECR_REGISTRY/2k-scout-$svc:$IMAGE_TAG
+        done
+  post_build:
+    commands:
+      - echo "All images pushed successfully."
+      - printf '{"IMAGE_TAG":"%s","ECR_REGISTRY":"%s"}' $IMAGE_TAG $ECR_REGISTRY > build-output.json
+
+artifacts:
+  files:
+    - "**/*"
+    - build-output.json
+  name: docker-output

@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/cthomastl/2k-scout-frontend:latest
+          image: ECR_REGISTRY/2k-scout-frontend:IMAGE_TAG
           ports:
             - containerPort: 80
           resources:

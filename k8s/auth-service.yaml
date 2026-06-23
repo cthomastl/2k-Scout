@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: auth-service
-          image: ghcr.io/cthomastl/2k-scout-auth-service:latest
+          image: ECR_REGISTRY/2k-scout-auth-service:IMAGE_TAG
           ports:
             - containerPort: 3003
           env:

@@ -4,11 +4,18 @@ metadata:
   name: 2k-scout-ingress
   namespace: 2k-scout
   annotations:
-    kubernetes.io/ingress.class: nginx
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    # Replace with your ACM certificate ARN
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:ACCOUNT_ID:certificate/CERT_ID
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
 spec:
-  ingressClassName: nginx
+  ingressClassName: alb
   rules:
-    - host: 2kscout.local
+    # Replace 2kscout.yourdomain.com with your actual domain
+    - host: 2kscout.yourdomain.com
       http:
         paths:
           - path: /api

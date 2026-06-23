@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: gateway
-          image: ghcr.io/cthomastl/2k-scout-gateway:latest
+          image: ECR_REGISTRY/2k-scout-gateway:IMAGE_TAG
           ports:
             - containerPort: 8080
           env:

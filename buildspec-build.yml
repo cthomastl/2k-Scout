@@ -1,0 +1,20 @@
+version: 0.2
+
+# Stage 1: Lint and build the React frontend.
+# Fails fast if the build is broken before touching Docker or EKS.
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+  pre_build:
+    commands:
+      - echo "Installing dependencies..."
+      - npm ci
+  build:
+    commands:
+      - echo "Building frontend..."
+      - npm run build
+artifacts:
+  files:
+    - "**/*"
+  name: source

@@ -1,0 +1,47 @@
+version: 0.2
+
+# Stage 3: Substitute image references and apply manifests to EKS.
+# Required CodeBuild environment variables:
+#   AWS_ACCOUNT_ID  - your 12-digit AWS account ID
+#   AWS_REGION      - e.g. us-east-1
+#   EKS_CLUSTER     - your EKS cluster name, e.g. 2k-scout
+# Required IAM permissions on the CodeBuild role:
+#   eks:DescribeCluster
+#   (plus the CodeBuild role must be in aws-auth ConfigMap with cluster access)
+env:
+  variables:
+    AWS_REGION: "us-east-1"
+    EKS_CLUSTER: "2k-scout"
+
+phases:
+  pre_build:
+    commands:
+      - echo "Configuring kubectl for EKS cluster $EKS_CLUSTER..."
+      - aws eks update-kubeconfig --name $EKS_CLUSTER --region $AWS_REGION
+      - export ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+      - export IMAGE_TAG=$CODEBUILD_RESOLVED_SOURCE_VERSION
+      - echo "Deploying image tag $IMAGE_TAG from $ECR_REGISTRY"
+  build:
+    commands:
+      - echo "Substituting image placeholders in manifests..."
+      - sed -i "s|ECR_REGISTRY|$ECR_REGISTRY|g" k8s/*.yaml
+      - sed -i "s/IMAGE_TAG/$IMAGE_TAG/g" k8s/*.yaml
+      - echo "Applying Kubernetes manifests..."
+      - kubectl apply -f k8s/namespace.yaml
+      - kubectl apply -f k8s/external-secret.yaml
+      - kubectl apply -f k8s/gateway.yaml
+      - kubectl apply -f k8s/team-service.yaml
+      - kubectl apply -f k8s/ai-service.yaml
+      - kubectl apply -f k8s/auth-service.yaml
+      - kubectl apply -f k8s/frontend.yaml
+      - kubectl apply -f k8s/ingress.yaml
+  post_build:
+    commands:
+      - echo "Waiting for rollouts to complete..."
+      - kubectl rollout status deployment/gateway -n 2k-scout --timeout=5m
+      - kubectl rollout status deployment/team-service -n 2k-scout --timeout=5m
+      - kubectl rollout status deployment/ai-service -n 2k-scout --timeout=5m
+      - kubectl rollout status deployment/auth-service -n 2k-scout --timeout=5m
+      - kubectl rollout status deployment/frontend -n 2k-scout --timeout=5m
+      - echo "Deploy complete."
+      - kubectl get ingress -n 2k-scout
