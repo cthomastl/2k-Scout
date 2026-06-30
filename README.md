@@ -98,6 +98,20 @@ cp k8s/secrets.example.yaml k8s/secrets.yaml && kubectl apply -f k8s/secrets.yam
 kubectl apply -f k8s/
 ```
 
+### Local cluster with k3d (k3s)
+
+No cluster handy? `k8s/setup-k3d.sh` spins up a local k3s cluster via
+[k3d](https://k3d.io), disables the default Traefik ingress (the manifests
+here use `ingressClassName: nginx`), and installs ingress-nginx in its place:
+
+```bash
+./k8s/setup-k3d.sh
+```
+
+Then follow the printed steps to apply the namespace, secrets, and manifests.
+[k9s](https://k9scli.io) is a handy terminal UI for watching pods/logs across
+the five services once deployed.
+
 Add `2kscout.local` to your hosts file (pointing at the ingress IP) to reach the app.
 
 ## CI/CD
