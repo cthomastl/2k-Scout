@@ -14,6 +14,7 @@ dist-ssr
 .env
 lambda.zip
 lambda/package-lock.json
+k8s/secrets.yaml
 
 # Editor directories and files
 .vscode/*
