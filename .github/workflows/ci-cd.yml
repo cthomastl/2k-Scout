@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - 'claude/**'
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:
@@ -55,6 +57,7 @@ jobs:
           tags: |
             type=raw,value=latest
             type=raw,value=${{ github.sha }}
+            type=ref,event=tag
 
       - name: Build & push
         uses: docker/build-push-action@v6
@@ -62,7 +65,5 @@ jobs:
           context: ${{ matrix.service == 'frontend' && '.' || format('services/{0}', matrix.service) }}
           file: ${{ matrix.service == 'frontend' && 'Dockerfile.frontend' || format('services/{0}/Dockerfile', matrix.service) }}
           push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/2k-scout-${{ matrix.service }}:latest
-            ghcr.io/${{ github.repository_owner }}/2k-scout-${{ matrix.service }}:${{ github.sha }}
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
