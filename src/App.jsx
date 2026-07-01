@@ -1123,7 +1123,7 @@ export default function App() {
       <aside className="sidebar">
         <div className="sidebar-brand">
           <span className="brand-mark">2K</span>
-          <span className="brand-name">Scout</span>
+          <span className="brand-name">Scout DEV</span>
         </div>
         <nav className="sidebar-nav">
           {NAV_ITEMS.map(({ id, label, Icon }) => (
