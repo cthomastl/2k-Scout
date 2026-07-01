@@ -3,10 +3,8 @@ kind: Ingress
 metadata:
   name: 2k-scout-ingress
   namespace: 2k-scout
-  annotations:
-    kubernetes.io/ingress.class: nginx
 spec:
-  ingressClassName: nginx
+  ingressClassName: traefik
   rules:
     - host: 2kscout.local
       http:
