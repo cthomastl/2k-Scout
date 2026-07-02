@@ -114,6 +114,18 @@ the five services once deployed.
 
 Add `2kscout.local` to your hosts file (pointing at the ingress IP) to reach the app.
 
+### Local cluster with kind
+
+Prefer [kind](https://kind.sigs.k8s.io) (Kubernetes-in-Docker)? `k8s/setup-kind.sh`
+creates a cluster from `k8s/kind-config.yaml` (host ports 80/443 mapped in) and
+installs the kind-flavored ingress-nginx manifest:
+
+```bash
+./k8s/setup-kind.sh
+```
+
+Then follow the printed steps, same as the k3d flow above.
+
 ## CI/CD
 
 `.github/workflows/ci-cd.yml` runs on pushes to `main` and `claude/**`:
