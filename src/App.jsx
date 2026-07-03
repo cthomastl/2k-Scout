@@ -955,7 +955,7 @@ function Login({ onLogin, theme, onToggleTheme }) {
       <form className="login-card" onSubmit={submit}>
         <div className="login-brand">
           <span className="brand-mark">2K</span>
-          <span className="brand-name">Scout</span>
+          <span className="brand-name">Scout DEV1</span>
         </div>
         <h1 className="login-title">Sign in</h1>
         <p className="login-sub">Pre-game scouting for NBA 2K All-Time teams</p>
