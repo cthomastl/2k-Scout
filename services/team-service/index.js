@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import client from 'prom-client'
 
 const PORT = process.env.PORT || 3001
 const UPSTREAM = 'https://api.nba2kapi.com'
@@ -9,8 +10,31 @@ const CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
 const app = express()
 app.use(cors())
 
+const register = new client.Registry()
+client.collectDefaultMetrics({ register })
+
+const httpRequestDuration = new client.Histogram({
+  name: 'http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route', 'status_code'],
+  registers: [register],
+})
+
+app.use((req, res, next) => {
+  const end = httpRequestDuration.startTimer()
+  res.on('finish', () => {
+    end({ method: req.method, route: req.path, status_code: res.statusCode })
+  })
+  next()
+})
+
 app.get('/healthz', (req, res) => {
   res.status(200).json({ status: 'ok' })
+})
+
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType)
+  res.end(await register.metrics())
 })
 
 // In-memory cache keyed by full path + query string.

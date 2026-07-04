@@ -17,7 +17,8 @@ spec:
         - name: ai-service
           image: ghcr.io/cthomastl/2k-scout-ai-service:latest
           ports:
-            - containerPort: 3002
+            - name: http
+              containerPort: 3002
           env:
             - name: ANTHROPIC_API_KEY
               valueFrom:
@@ -54,5 +55,6 @@ spec:
   selector:
     app: ai-service
   ports:
-    - port: 3002
+    - name: http
+      port: 3002
       targetPort: 3002

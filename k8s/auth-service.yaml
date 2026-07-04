@@ -17,7 +17,8 @@ spec:
         - name: auth-service
           image: ghcr.io/cthomastl/2k-scout-auth-service:latest
           ports:
-            - containerPort: 3003
+            - name: http
+              containerPort: 3003
           env:
             - name: JWT_SECRET
               valueFrom:
@@ -64,5 +65,6 @@ spec:
   selector:
     app: auth-service
   ports:
-    - port: 3003
+    - name: http
+      port: 3003
       targetPort: 3003

@@ -17,7 +17,8 @@ spec:
         - name: gateway
           image: ghcr.io/cthomastl/2k-scout-gateway:latest
           ports:
-            - containerPort: 8080
+            - name: http
+              containerPort: 8080
           env:
             - name: AI_SERVICE_URL
               value: "http://ai-service:3002"
@@ -55,5 +56,6 @@ spec:
   selector:
     app: gateway
   ports:
-    - port: 8080
+    - name: http
+      port: 8080
       targetPort: 8080

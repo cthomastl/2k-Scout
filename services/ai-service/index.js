@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import Anthropic from '@anthropic-ai/sdk'
+import promClient from 'prom-client'
 
 const PORT = process.env.PORT || 3002
 
@@ -10,8 +11,31 @@ const app = express()
 app.use(cors())
 app.use(express.json({ limit: '1mb' }))
 
+const register = new promClient.Registry()
+promClient.collectDefaultMetrics({ register })
+
+const httpRequestDuration = new promClient.Histogram({
+  name: 'http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route', 'status_code'],
+  registers: [register],
+})
+
+app.use((req, res, next) => {
+  const end = httpRequestDuration.startTimer()
+  res.on('finish', () => {
+    end({ method: req.method, route: req.path, status_code: res.statusCode })
+  })
+  next()
+})
+
 app.get('/healthz', (req, res) => {
   res.status(200).json({ status: 'ok' })
+})
+
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType)
+  res.end(await register.metrics())
 })
 
 function buildPrompt({ myTeam, opponentTeam, attackTargets, hideTargets, leaveOpen, speedAdvantage, bestMatchups, myKeyPlayers, oppKeyPlayers, opponentStrategy }) {

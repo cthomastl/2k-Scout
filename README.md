@@ -126,6 +126,31 @@ installs the kind-flavored ingress-nginx manifest:
 
 Then follow the printed steps, same as the k3d flow above.
 
+## Observability
+
+`gateway`, `team-service`, `ai-service`, and `auth-service` each expose Prometheus
+metrics at `/metrics` via `prom-client` (default Node.js process metrics plus an
+`http_request_duration_seconds` histogram labeled by method/route/status code).
+`frontend` is a static nginx SPA and isn't instrumented.
+
+Install `kube-prometheus-stack` (Prometheus + Grafana + Alertmanager) and the
+`ServiceMonitor`s that wire it up to the four services:
+
+```bash
+./k8s/setup-monitoring.sh
+```
+
+Then:
+
+```bash
+kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 3000:80
+```
+
+Open `http://localhost:3000` (`admin` / `admin`) and check **Status > Targets**
+in Prometheus (`kubectl port-forward svc/kube-prometheus-stack-prometheus -n
+monitoring 9090:9090`) to confirm all four services show as `up` before
+building dashboards.
+
 ## CI/CD
 
 `.github/workflows/ci-cd.yml` runs on pushes to `main` and `claude/**`:

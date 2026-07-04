@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import { createProxyMiddleware } from 'http-proxy-middleware'
+import client from 'prom-client'
 
 const PORT = process.env.PORT || 8080
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://ai-service:3002'
@@ -10,8 +11,31 @@ const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://auth-service:30
 const app = express()
 app.use(cors())
 
+const register = new client.Registry()
+client.collectDefaultMetrics({ register })
+
+const httpRequestDuration = new client.Histogram({
+  name: 'http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route', 'status_code'],
+  registers: [register],
+})
+
+app.use((req, res, next) => {
+  const end = httpRequestDuration.startTimer()
+  res.on('finish', () => {
+    end({ method: req.method, route: req.path, status_code: res.statusCode })
+  })
+  next()
+})
+
 app.get('/healthz', (req, res) => {
   res.status(200).json({ status: 'ok' })
+})
+
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType)
+  res.end(await register.metrics())
 })
 
 // Proxies are mounted WITHOUT an Express path prefix and instead select requests
