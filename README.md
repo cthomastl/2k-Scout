@@ -148,8 +148,13 @@ kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 3000:80
 
 Open `http://localhost:3000` (`admin` / `admin`) and check **Status > Targets**
 in Prometheus (`kubectl port-forward svc/kube-prometheus-stack-prometheus -n
-monitoring 9090:9090`) to confirm all four services show as `up` before
-building dashboards.
+monitoring 9090:9090`) to confirm all four services show as `up`.
+
+A starter dashboard ("2K Scout - Service Overview") is auto-provisioned via
+`k8s/monitoring/dashboards-configmap.yaml` (Grafana's sidecar picks up any
+ConfigMap labeled `grafana_dashboard: "1"`). It covers the four golden
+signals for each service: services up, request rate, 5xx error rate, and
+p95 latency, plus pod restarts in the `2k-scout` namespace.
 
 ## CI/CD
 
