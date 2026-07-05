@@ -60,6 +60,8 @@ kind: Service
 metadata:
   name: auth-service
   namespace: 2k-scout
+  labels:
+    app: auth-service
 spec:
   type: ClusterIP
   selector:

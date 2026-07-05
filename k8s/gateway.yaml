@@ -51,6 +51,8 @@ kind: Service
 metadata:
   name: gateway
   namespace: 2k-scout
+  labels:
+    app: gateway
 spec:
   type: ClusterIP
   selector:

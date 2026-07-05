@@ -50,6 +50,8 @@ kind: Service
 metadata:
   name: team-service
   namespace: 2k-scout
+  labels:
+    app: team-service
 spec:
   type: ClusterIP
   selector:
