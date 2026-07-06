@@ -98,6 +98,30 @@ cp k8s/secrets.example.yaml k8s/secrets.yaml && kubectl apply -f k8s/secrets.yam
 kubectl apply -f k8s/
 ```
 
+Applying `namespace.yaml` first matters: `kubectl apply -f k8s/` applies files in
+alphabetical order, and several service manifests sort before `namespace.yaml` —
+skipping this step gets you `namespaces "2k-scout" not found` errors on a brand
+new cluster.
+
+### Data & caching
+
+`k8s/postgres.yaml` and `k8s/redis.yaml` deploy a single-replica Postgres and
+Redis into the `2k-scout` namespace alongside the app — both are picked up by
+the same `kubectl apply -f k8s/` above, nothing extra to run.
+
+- **Postgres** backs real user accounts (`auth-service`), saved game plan
+  history and usage tracking (`ai-service`). `auth-service` creates its
+  `users` table (and seeds the demo account) on startup; `ai-service` creates
+  `gameplans` and `usage_events` the same way — no separate migration step.
+- **Redis** caches `team-service`'s nba2kapi.com responses (shared across
+  replicas now, instead of each pod keeping its own separate in-memory cache)
+  and `ai-service`'s generated game plans (keyed by team matchup, 6h TTL) —
+  a repeat matchup returns instantly instead of re-calling Claude.
+- `secrets.example.yaml` includes `POSTGRES_PASSWORD`, `DATABASE_URL`, and
+  `REDIS_URL`. The defaults point at the in-cluster Postgres/Redis above; swap
+  `DATABASE_URL` for an RDS endpoint (or your own local Postgres) later
+  without any code changes — both services just read the connection string.
+
 ### Local cluster with k3d (k3s)
 
 No cluster handy? `k8s/setup-k3d.sh` spins up a local k3s cluster via

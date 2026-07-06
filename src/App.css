@@ -1212,6 +1212,56 @@
 .dash-cta-title { font-size: 15px; font-weight: 700; }
 .dash-cta-sub { font-size: 13px; opacity: 0.8; margin-top: 2px; }
 
+/* ── History ── */
+.history-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 64px 20px;
+}
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 720px;
+}
+.history-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 20px;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+.history-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.history-matchup {
+  font-weight: 700;
+  font-size: 14px;
+}
+.history-vs {
+  color: var(--text-muted);
+  font-weight: 400;
+  margin: 0 4px;
+}
+.history-date {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.history-body {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
 /* ── Settings ── */
 .settings-page {
   display: flex;
@@ -1351,6 +1401,18 @@
   text-align: center;
 }
 .login-demo strong { color: var(--text-2); }
+.login-mode-toggle {
+  margin-top: 14px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  width: 100%;
+}
+.login-mode-toggle:hover { text-decoration: underline; }
 
 /* ── Responsive ── */
 @media (max-width: 760px) {

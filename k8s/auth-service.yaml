@@ -35,6 +35,11 @@ spec:
                 secretKeyRef:
                   name: 2k-scout-secrets
                   key: DEMO_PASSWORD
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: 2k-scout-secrets
+                  key: DATABASE_URL
           resources:
             requests:
               cpu: 50m

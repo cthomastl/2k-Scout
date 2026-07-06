@@ -2,10 +2,17 @@ import express from 'express'
 import cors from 'cors'
 import Anthropic from '@anthropic-ai/sdk'
 import promClient from 'prom-client'
+import jwt from 'jsonwebtoken'
+import pg from 'pg'
+import { createClient } from 'redis'
 
 const PORT = process.env.PORT || 3002
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me'
+const DATABASE_URL = process.env.DATABASE_URL
+const REDIS_URL = process.env.REDIS_URL || 'redis://redis:6379'
+const GAMEPLAN_CACHE_TTL_SECONDS = 6 * 60 * 60 // 6 hours — roster/attribute data doesn't change minute to minute
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 const app = express()
 app.use(cors())
@@ -18,6 +25,18 @@ const httpRequestDuration = new promClient.Histogram({
   name: 'http_request_duration_seconds',
   help: 'Duration of HTTP requests in seconds',
   labelNames: ['method', 'route', 'status_code'],
+  registers: [register],
+})
+
+const cacheHits = new promClient.Counter({
+  name: 'cache_hits_total',
+  help: 'Number of gameplan requests served from the Redis cache',
+  registers: [register],
+})
+
+const cacheMisses = new promClient.Counter({
+  name: 'cache_misses_total',
+  help: 'Number of gameplan requests that missed the Redis cache and called Claude',
   registers: [register],
 })
 
@@ -37,6 +56,61 @@ app.get('/metrics', async (req, res) => {
   res.set('Content-Type', register.contentType)
   res.end(await register.metrics())
 })
+
+function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization || ''
+  const match = authHeader.match(/^Bearer\s+(.+)$/i)
+  if (!match) {
+    return res.status(401).json({ error: 'Missing or invalid Authorization header' })
+  }
+  try {
+    req.user = jwt.verify(match[1], JWT_SECRET)
+    next()
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired token' })
+  }
+}
+
+const pool = new pg.Pool({ connectionString: DATABASE_URL })
+
+async function initDb() {
+  const maxAttempts = 10
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS gameplans (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          team_a TEXT NOT NULL,
+          team_b TEXT NOT NULL,
+          generated_text TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `)
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS usage_events (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          event_type TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `)
+      console.log('ai-service: database ready')
+      return
+    } catch (err) {
+      console.error(`ai-service: database not ready (attempt ${attempt}/${maxAttempts}): ${err.message}`)
+      if (attempt === maxAttempts) throw err
+      await new Promise(r => setTimeout(r, 2000))
+    }
+  }
+}
+
+const redis = createClient({ url: REDIS_URL })
+redis.on('error', err => console.error('Redis error:', err.message))
+
+function gameplanCacheKey(myTeam, opponentTeam) {
+  return `gameplan:v1:${myTeam}::${opponentTeam}`
+}
 
 function buildPrompt({ myTeam, opponentTeam, attackTargets, hideTargets, leaveOpen, speedAdvantage, bestMatchups, myKeyPlayers, oppKeyPlayers, opponentStrategy }) {
   const fmt = lines => lines.length ? lines.join('\n') : '  - No data'
@@ -123,7 +197,7 @@ COACHING RULES:
 Format: 5 sections with short bullet points (•). Max 4 bullets per section. Max 1 sentence per bullet. Total under 350 words. Plain text only.`
 }
 
-app.post('/api/gameplan', async (req, res) => {
+app.post('/api/gameplan', requireAuth, async (req, res) => {
   const body = req.body || {}
 
   const {
@@ -138,10 +212,28 @@ app.post('/api/gameplan', async (req, res) => {
     return res.status(400).json({ error: 'myTeam and opponentTeam are required' })
   }
 
+  const cacheKey = gameplanCacheKey(myTeam, opponentTeam)
+
+  try {
+    const cached = await redis.get(cacheKey)
+    if (cached) {
+      cacheHits.inc()
+      await pool.query(
+        'INSERT INTO usage_events (user_id, event_type) VALUES ($1, $2)',
+        [req.user.id, 'gameplan_cache_hit']
+      )
+      return res.status(200).json({ gamePlan: cached, cached: true })
+    }
+  } catch (err) {
+    console.error('Redis read error (continuing without cache):', err.message)
+  }
+
+  cacheMisses.inc()
+
   try {
     const prompt = buildPrompt({ myTeam, opponentTeam, attackTargets, hideTargets, leaveOpen, speedAdvantage, bestMatchups, myKeyPlayers, oppKeyPlayers, opponentStrategy })
 
-    const message = await client.messages.create({
+    const message = await anthropic.messages.create({
       model: 'claude-opus-4-8',
       max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }],
@@ -151,13 +243,58 @@ app.post('/api/gameplan', async (req, res) => {
     if (!textBlock) throw new Error('No text block in Claude response')
     const gamePlan = textBlock.text
 
-    return res.status(200).json({ gamePlan })
+    try {
+      await redis.setEx(cacheKey, GAMEPLAN_CACHE_TTL_SECONDS, gamePlan)
+    } catch (err) {
+      console.error('Redis write error (continuing without cache):', err.message)
+    }
+
+    await pool.query(
+      `INSERT INTO gameplans (user_id, team_a, team_b, generated_text) VALUES ($1, $2, $3, $4)`,
+      [req.user.id, myTeam, opponentTeam, gamePlan]
+    )
+    await pool.query(
+      'INSERT INTO usage_events (user_id, event_type) VALUES ($1, $2)',
+      [req.user.id, 'gameplan_generated']
+    )
+
+    return res.status(200).json({ gamePlan, cached: false })
   } catch (err) {
     console.error('Claude API error:', err)
     return res.status(500).json({ error: err.message || 'Failed to generate game plan' })
   }
 })
 
-app.listen(PORT, () => {
-  console.log(`ai-service listening on ${PORT}`)
+app.get('/api/gameplan/history', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, team_a, team_b, generated_text, created_at
+       FROM gameplans
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 20`,
+      [req.user.id]
+    )
+    return res.status(200).json({ gameplans: result.rows })
+  } catch (err) {
+    console.error('History fetch error:', err)
+    return res.status(500).json({ error: 'Failed to load history' })
+  }
 })
+
+// Redis is a nice-to-have cache, not a hard dependency — both the read and
+// write around it above already fall back to "just call Claude" on error, so
+// it shouldn't block startup the way Postgres (required for saving history
+// and usage events on every request) does.
+redis.connect().catch(err => console.error('ai-service: Redis connect failed, starting without cache:', err.message))
+
+initDb()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`ai-service listening on ${PORT}`)
+    })
+  })
+  .catch(err => {
+    console.error('ai-service: failed to initialize database, exiting', err)
+    process.exit(1)
+  })

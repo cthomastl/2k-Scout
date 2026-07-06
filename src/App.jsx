@@ -38,6 +38,7 @@ const IconTarget = p => <Icon {...p} path={<><circle cx="12" cy="12" r="10"/><ci
 const IconBolt = p => <Icon {...p} path={<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>} />
 const IconShield = p => <Icon {...p} path={<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>} />
 const IconArrowRight = p => <Icon {...p} path={<><path d="M5 12h14M12 5l7 7-7 7"/></>} />
+const IconHistory = p => <Icon {...p} path={<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></>} />
 
 function getRatingColor(val) {
   const n = parseInt(val, 10)
@@ -327,7 +328,7 @@ function dedupeByName(list) {
   })
 }
 
-function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
+function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam, token }) {
   const [gamePlan, setGamePlan] = useState(null)
   const [planLoading, setPlanLoading] = useState(false)
   const [planError, setPlanError] = useState(null)
@@ -479,7 +480,10 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
 
       const res = await fetch(GAMEPLAN_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           myTeam, opponentTeam,
           attackTargets, hideTargets, leaveOpen,
@@ -899,6 +903,52 @@ function TeamRankings({ teams, teamsLoading }) {
   )
 }
 
+function GameplanHistory({ token }) {
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [openId, setOpenId] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/gameplan/history', { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => {
+        if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`)
+        return res.json()
+      })
+      .then(data => { if (!cancelled) setItems(data.gameplans || []) })
+      .catch(e => { if (!cancelled) setError(e.message) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [token])
+
+  if (loading) return <Spinner center label="Loading history…" />
+  if (error) return <div className="api-error center-loading">Failed to load history: {error}</div>
+
+  if (items.length === 0) {
+    return (
+      <div className="history-empty">
+        <IconHistory size={32} />
+        <p>No saved game plans yet — generate one from the Scout tab and it'll show up here.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="history-list">
+      {items.map(item => (
+        <div key={item.id} className="history-card" onClick={() => setOpenId(openId === item.id ? null : item.id)}>
+          <div className="history-card-head">
+            <div className="history-matchup">{item.team_a} <span className="history-vs">vs</span> {item.team_b}</div>
+            <div className="history-date">{new Date(item.created_at).toLocaleString()}</div>
+          </div>
+          {openId === item.id && <p className="game-plan-text history-body">{item.generated_text}</p>}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function useTheme() {
   const [theme, setTheme] = useState(() => localStorage.getItem('2ks-theme') || 'light')
   useEffect(() => {
@@ -931,20 +981,43 @@ async function attemptLogin(email, password) {
   return { error: 'Invalid email or password' }
 }
 
+async function attemptSignup(email, password) {
+  try {
+    const res = await fetch(`${AUTH_BASE}/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    const d = await res.json()
+    if (res.ok) return { token: d.token, user: d.user }
+    return { error: d.error || 'Failed to create account' }
+  } catch {
+    return { error: 'Could not reach the auth service' }
+  }
+}
+
 function Login({ onLogin, theme, onToggleTheme }) {
+  const [mode, setMode] = useState('signin') // 'signin' | 'signup'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
 
+  const isSignup = mode === 'signup'
+
   async function submit(e) {
     e.preventDefault()
     setBusy(true)
     setError(null)
-    const res = await attemptLogin(email, password)
+    const res = isSignup ? await attemptSignup(email, password) : await attemptLogin(email, password)
     setBusy(false)
     if (res.error) { setError(res.error); return }
     onLogin(res.token, res.user)
+  }
+
+  function toggleMode() {
+    setMode(m => (m === 'signup' ? 'signin' : 'signup'))
+    setError(null)
   }
 
   return (
@@ -957,7 +1030,7 @@ function Login({ onLogin, theme, onToggleTheme }) {
           <span className="brand-mark">2K</span>
           <span className="brand-name">Scout</span>
         </div>
-        <h1 className="login-title">Sign in</h1>
+        <h1 className="login-title">{isSignup ? 'Create account' : 'Sign in'}</h1>
         <p className="login-sub">Pre-game scouting for NBA 2K All-Time teams</p>
 
         <label className="login-label">Email</label>
@@ -965,18 +1038,27 @@ function Login({ onLogin, theme, onToggleTheme }) {
           value={email} onChange={e => setEmail(e.target.value)} placeholder="scout@2kscout.app" required />
 
         <label className="login-label">Password</label>
-        <input className="login-input" type="password" autoComplete="current-password"
-          value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
+        <input className="login-input" type="password" autoComplete={isSignup ? 'new-password' : 'current-password'}
+          value={password} onChange={e => setPassword(e.target.value)}
+          placeholder={isSignup ? 'At least 6 characters' : '••••••••'} required minLength={isSignup ? 6 : undefined} />
 
         {error && <div className="login-error">{error}</div>}
 
         <button className="login-btn" type="submit" disabled={busy}>
-          {busy ? 'Signing in…' : 'Sign In'}
+          {busy
+            ? (isSignup ? 'Creating account…' : 'Signing in…')
+            : (isSignup ? 'Create account' : 'Sign In')}
         </button>
 
-        <div className="login-demo">
-          Demo access — <strong>{DEMO_EMAIL}</strong> / <strong>{DEMO_PASSWORD}</strong>
-        </div>
+        <button type="button" className="login-mode-toggle" onClick={toggleMode}>
+          {isSignup ? 'Already have an account? Sign in' : "Don't have an account? Create one"}
+        </button>
+
+        {!isSignup && (
+          <div className="login-demo">
+            Demo access — <strong>{DEMO_EMAIL}</strong> / <strong>{DEMO_PASSWORD}</strong>
+          </div>
+        )}
       </form>
     </div>
   )
@@ -1033,6 +1115,7 @@ const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', Icon: IconDashboard },
   { id: 'scout', label: 'Scout', Icon: IconScout },
   { id: 'rankings', label: 'Rankings', Icon: IconRankings },
+  { id: 'history', label: 'History', Icon: IconHistory },
   { id: 'settings', label: 'Settings', Icon: IconSettings },
 ]
 
@@ -1178,13 +1261,17 @@ export default function App() {
               )}
               {bothSelected && (
                 <MatchupAnalyzer myRoster={myRoster} myTeam={myTeam}
-                  opponentRoster={oppRoster} opponentTeam={oppTeam} />
+                  opponentRoster={oppRoster} opponentTeam={oppTeam} token={token} />
               )}
             </>
           )}
 
           {page === 'rankings' && (
             <TeamRankings teams={teams} teamsLoading={teamsLoading} />
+          )}
+
+          {page === 'history' && (
+            <GameplanHistory token={token} />
           )}
 
           {page === 'settings' && (

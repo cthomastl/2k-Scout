@@ -25,6 +25,21 @@ spec:
                 secretKeyRef:
                   name: 2k-scout-secrets
                   key: ANTHROPIC_API_KEY
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: 2k-scout-secrets
+                  key: JWT_SECRET
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: 2k-scout-secrets
+                  key: DATABASE_URL
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: 2k-scout-secrets
+                  key: REDIS_URL
           resources:
             requests:
               cpu: 50m

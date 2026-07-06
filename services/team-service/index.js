@@ -1,11 +1,13 @@
 import express from 'express'
 import cors from 'cors'
 import client from 'prom-client'
+import { createClient } from 'redis'
 
 const PORT = process.env.PORT || 3001
 const UPSTREAM = 'https://api.nba2kapi.com'
 const API_KEY = process.env.NBA2K_API_KEY || ''
-const CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
+const REDIS_URL = process.env.REDIS_URL || 'redis://redis:6379'
+const CACHE_TTL_SECONDS = 60 * 60 // 1 hour
 
 const app = express()
 app.use(cors())
@@ -17,6 +19,18 @@ const httpRequestDuration = new client.Histogram({
   name: 'http_request_duration_seconds',
   help: 'Duration of HTTP requests in seconds',
   labelNames: ['method', 'route', 'status_code'],
+  registers: [register],
+})
+
+const cacheHits = new client.Counter({
+  name: 'cache_hits_total',
+  help: 'Number of requests served from the Redis cache',
+  registers: [register],
+})
+
+const cacheMisses = new client.Counter({
+  name: 'cache_misses_total',
+  help: 'Number of requests that missed the Redis cache and hit nba2kapi.com',
   registers: [register],
 })
 
@@ -37,32 +51,29 @@ app.get('/metrics', async (req, res) => {
   res.end(await register.metrics())
 })
 
-// In-memory cache keyed by full path + query string.
-const cache = new Map()
-
-function getCached(key) {
-  const entry = cache.get(key)
-  if (!entry) return null
-  if (Date.now() - entry.at > CACHE_TTL_MS) {
-    cache.delete(key)
-    return null
-  }
-  return entry.data
-}
-
-function setCached(key, data) {
-  cache.set(key, { at: Date.now(), data })
-}
+// Shared cache across every team-service replica, keyed by full path + query
+// string. Previously an in-memory Map — that meant each replica had its own
+// separate cache (diluting the hit rate across replicas) and lost everything
+// on every pod restart. Redis fixes both.
+const redis = createClient({ url: REDIS_URL })
+redis.on('error', err => console.error('Redis error:', err.message))
 
 // Generic proxy: forward GET /api/* to https://api.nba2kapi.com/api/* with the
 // server-side API key header. Caches the JSON response for 1 hour.
 app.get('/api/*', async (req, res) => {
-  const key = req.originalUrl // full path + query string
+  const key = `team-service:${req.originalUrl}` // full path + query string
 
-  const cached = getCached(key)
-  if (cached !== null) {
-    return res.status(200).json(cached)
+  try {
+    const cached = await redis.get(key)
+    if (cached !== null) {
+      cacheHits.inc()
+      return res.status(200).json(JSON.parse(cached))
+    }
+  } catch (err) {
+    console.error('Redis read error (continuing without cache):', err.message)
   }
+
+  cacheMisses.inc()
 
   const upstreamUrl = `${UPSTREAM}${req.originalUrl}`
 
@@ -84,13 +95,23 @@ app.get('/api/*', async (req, res) => {
     }
 
     const data = await upstreamRes.json()
-    setCached(key, data)
+    try {
+      await redis.setEx(key, CACHE_TTL_SECONDS, JSON.stringify(data))
+    } catch (err) {
+      console.error('Redis write error (continuing without cache):', err.message)
+    }
     return res.status(200).json(data)
   } catch (err) {
     console.error('Proxy error:', err)
     return res.status(502).json({ error: err.message || 'Upstream request failed' })
   }
 })
+
+// Caching is a nice-to-have, not a hard dependency — every cache operation
+// above already falls back to "just hit the upstream API" on a Redis error,
+// so a slow/unavailable Redis at startup shouldn't block this service from
+// serving traffic at all.
+redis.connect().catch(err => console.error('team-service: Redis connect failed, starting without cache:', err.message))
 
 app.listen(PORT, () => {
   console.log(`team-service listening on ${PORT}`)

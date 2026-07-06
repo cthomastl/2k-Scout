@@ -11,6 +11,9 @@
     "@anthropic-ai/sdk": "^0.52.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
-    "prom-client": "^15.1.3"
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1",
+    "prom-client": "^15.1.3",
+    "redis": "^4.7.0"
   }
 }
