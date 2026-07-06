@@ -26,7 +26,7 @@ holds the server-side services.
                    │ nginx + dist     │   │ http-proxy-middleware    │
                    │ (SPA, port 80)   │   └───────┬─────────┬────────┘
                    └──────────────────┘           │         │
-                            /api/gameplan ────────┘         │
+                            /api/gameplan* ───────┘         │
                             /api/*  ──────┐    /auth/*  ─────┘
                                           │         │
                   ┌───────────────────────┼─────────┼──────────────────────┐
@@ -34,30 +34,43 @@ holds the server-side services.
         ┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐
         │ ai-service       │   │ team-service     │   │ auth-service     │
         │ (:3002)          │   │ (:3001)          │   │ (:3003)          │
-        │ Anthropic gameplan│  │ NBA2K proxy+cache│   │ JWT login / me   │
-        └────────┬─────────┘   └────────┬─────────┘   └──────────────────┘
-                 │                       │
-                 ▼                       ▼
-        Anthropic API           api.nba2kapi.com
-        (claude-opus-4-8)       (X-API-Key injected)
+        │ Anthropic gameplan│  │ NBA2K proxy+cache│   │ Accounts + JWT   │
+        │ (JWT required)*  │  │ (Redis cache)    │   │ (Postgres)       │
+        └───┬─────────┬────┘   └────────┬─────────┘   └────────┬─────────┘
+            │         │                  │                      │
+            ▼         ▼                  ▼                      ▼
+     Anthropic    Postgres           Redis ◀───────────────  Postgres
+       API      (gameplans,      (nba2kapi cache +
+    (claude-      usage_events)   gameplan cache)
+     opus-4-8)
+
+* /api/gameplan and /api/gameplan/history require `Authorization: Bearer <jwt>`.
 ```
 
 Request flow: **Ingress → gateway → service**. The gateway is the single entry
 point for `/api` and `/auth`; it reverse-proxies to the right backend. The
-frontend is a separate nginx container serving the static SPA build.
+frontend is a separate nginx container serving the static SPA build. Postgres
+and Redis are shared, in-cluster pods (`k8s/postgres.yaml`, `k8s/redis.yaml`) —
+`auth-service` and `ai-service` both talk to Postgres (separate tables, no
+foreign keys between them, so neither depends on the other's startup order);
+`team-service` and `ai-service` both talk to Redis (separate key prefixes).
 
 ## Services
 
 | Service        | Port (default) | Responsibility |
 |----------------|----------------|----------------|
 | `gateway`      | 8080           | API gateway / reverse proxy. Routes `/api/gameplan` → ai-service, `/api/*` → team-service, `/auth/*` → auth-service. Does not serve static files. |
-| `team-service` | 3001           | Proxies `api.nba2kapi.com`, injecting the `X-API-Key` header server-side. In-memory cache with 1-hour TTL keyed by full path + query. |
-| `ai-service`   | 3002           | `POST /api/gameplan` — builds the 2K coaching prompt and calls Anthropic (`claude-opus-4-8`, `max_tokens` 2000). Returns `{gamePlan}` or `{error}`. |
-| `auth-service` | 3003           | Demo auth. `POST /auth/login` returns a 7-day JWT; `GET /auth/me` verifies the Bearer token. |
+| `team-service` | 3001           | Proxies `api.nba2kapi.com`, injecting the `X-API-Key` header server-side. Redis cache, 1-hour TTL, keyed by full path + query — shared across replicas. |
+| `ai-service`   | 3002           | `POST /api/gameplan` (JWT required) — builds the 2K coaching prompt, checks a Redis cache keyed by team matchup (6h TTL) before calling Anthropic, then saves the result to Postgres (`gameplans`) and logs a `usage_events` row. `GET /api/gameplan/history` (JWT required) reads a user's saved plans back. |
+| `auth-service` | 3003           | Real accounts backed by Postgres (`users` table, bcrypt-hashed passwords). `POST /auth/signup`, `POST /auth/login` return a 7-day JWT (now including a numeric `id`); `GET /auth/me` verifies the Bearer token. The documented demo credential is seeded as a real row on startup, not a hardcoded special case. |
 | `frontend`     | 80             | nginx serving the Vite `dist/` build with SPA fallback. |
+| `postgres`     | 5432           | Accounts, game plan history, usage tracking. Single-replica `Deployment` + PVC — fine for this scale, but note it's a `Deployment`, not a `StatefulSet`; a real production Postgres would use a `StatefulSet` (or a Postgres Operator) plus a managed service like RDS rather than this by-hand setup. |
+| `redis`        | 6379           | Shared cache for `team-service` and `ai-service`. No persistence configured — it's a cache, losing it just means the next request repopulates it. |
 
-Every service exposes `GET /healthz` → `200 {status:'ok'}` and allows CORS from
-all origins.
+Every app service exposes `GET /healthz` → `200 {status:'ok'}` and allows CORS
+from all origins. `gateway`, `team-service`, `ai-service`, and `auth-service`
+also expose `GET /metrics` (Prometheus, via `prom-client`) — see the root
+[README's Observability section](../README.md#observability).
 
 ### Routes
 
@@ -67,15 +80,19 @@ all origins.
 - `GET /api/players/slug/:slug`
 - Implemented generically as `GET /api/*`.
 
-**ai-service**:
+**ai-service** (both require `Authorization: Bearer <jwt>`):
 - `POST /api/gameplan` — body fields: `myTeam`, `opponentTeam`, `attackTargets`,
   `hideTargets`, `leaveOpen`, `speedAdvantage`, `bestMatchups`, `myKeyPlayers`,
   `oppKeyPlayers`, `opponentStrategy`. `myTeam`/`opponentTeam` required (400 if
-  missing).
+  missing). Returns `{gamePlan, cached}`.
+- `GET /api/gameplan/history` — the caller's 20 most recent saved game plans,
+  newest first.
 
 **auth-service**:
-- `POST /auth/login` `{email, password}` → `{token, user:{email, name}}` or 401.
-- `GET /auth/me` with `Authorization: Bearer <token>` → `{user:{email, name}}` or 401.
+- `POST /auth/signup` `{email, password}` → `201 {token, user:{id, email, name}}`,
+  `409` if the email's taken, `400` if the password's under 6 characters.
+- `POST /auth/login` `{email, password}` → `{token, user:{id, email, name}}` or 401.
+- `GET /auth/me` with `Authorization: Bearer <token>` → `{user:{id, email, name}}` or 401.
 
 ## Environment variables
 
@@ -83,16 +100,26 @@ all origins.
 |----------------|--------------------|--------------------------|---------|
 | team-service   | `PORT`             | `3001`                   | Listen port |
 | team-service   | `NBA2K_API_KEY`    | _(none)_                 | Injected as `X-API-Key` to upstream |
+| team-service   | `REDIS_URL`        | `redis://redis:6379`     | Shared cache connection |
 | ai-service     | `PORT`             | `3002`                   | Listen port |
 | ai-service     | `ANTHROPIC_API_KEY`| _(none)_                 | Anthropic SDK auth |
+| ai-service     | `JWT_SECRET`       | `dev-secret-change-me`   | Verifies the Bearer token on incoming requests |
+| ai-service     | `DATABASE_URL`     | _(none)_                 | Postgres connection string (gameplans, usage_events) |
+| ai-service     | `REDIS_URL`        | `redis://redis:6379`     | Gameplan cache connection |
 | auth-service   | `PORT`             | `3003`                   | Listen port |
-| auth-service   | `DEMO_EMAIL`       | `scout@2kscout.app`      | Valid login email |
-| auth-service   | `DEMO_PASSWORD`    | `scout2k`                | Valid login password |
+| auth-service   | `DEMO_EMAIL`       | `scout@2kscout.app`      | Seeded demo account email |
+| auth-service   | `DEMO_PASSWORD`    | `scout2k`                | Seeded demo account password |
 | auth-service   | `JWT_SECRET`       | `dev-secret-change-me`   | JWT signing secret |
+| auth-service   | `DATABASE_URL`     | _(none)_                 | Postgres connection string (users) |
 | gateway        | `PORT`             | `8080`                   | Listen port |
 | gateway        | `AI_SERVICE_URL`   | `http://ai-service:3002` | ai-service base URL |
 | gateway        | `TEAM_SERVICE_URL` | `http://team-service:3001`| team-service base URL |
 | gateway        | `AUTH_SERVICE_URL` | `http://auth-service:3003`| auth-service base URL |
+
+`JWT_SECRET` must be identical across `auth-service` and `ai-service` — the
+former signs tokens, the latter verifies them; both read it from the same
+`2k-scout-secrets` key so this is automatic as long as you don't override one
+in isolation.
 
 ## Building images locally
 

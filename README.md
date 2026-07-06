@@ -6,7 +6,8 @@ microservices on Kubernetes, behind a login, with a light/dark dashboard UI.
 
 ## What it does
 
-Sign in, pick any two teams, and 2K Scout computes — for the **starting five only**:
+Sign in (or create an account), pick any two teams, and 2K Scout computes — for the
+**starting five only**:
 
 - **Attack Offensively** — opponent's weakest starting defenders to ISO
 - **Hide Defensively** — your weakest perimeter defenders paired with their worst shooters
@@ -18,33 +19,40 @@ Sign in, pick any two teams, and 2K Scout computes — for the **starting five o
 - **Lineups** — Closing, Pace & Space, Sharpshooters (positionally balanced), Lockdown, Twin Towers
 - **Team Rankings** — every All-Time team ranked across Speed, Perimeter D, Interior D, 3PT, Rebounding
 - **AI Game Plan** — full offensive/defensive scouting report from Claude, reasoning strictly from 2K stats
+- **History** — every generated game plan is saved to your account and revisitable later,
+  instead of being regenerated (and re-billed) from scratch each time
 
 ## Architecture
 
 ```
-                          ┌─────────────────────────────┐
-                          │   Kubernetes (ns: 2k-scout)  │
-                          │                              │
-   Browser ──▶ Ingress ──▶│  frontend  (nginx + SPA)     │
-              (host:      │     │                         │
-              2kscout     │     ▼  /api, /auth            │
-              .local)     │  gateway  (reverse proxy)     │
-                          │     ├── /api/gameplan ─▶ ai-service ──▶ Anthropic Claude
-                          │     ├── /api/*        ─▶ team-service ─▶ nba2kapi.com (cached)
-                          │     └── /auth/*       ─▶ auth-service (JWT login)
-                          └─────────────────────────────┘
+                          ┌───────────────────────────────────────────┐
+                          │          Kubernetes (ns: 2k-scout)         │
+                          │                                           │
+   Browser ──▶ Ingress ──▶│  frontend  (nginx + SPA)                  │
+              (host:      │     │                                     │
+              2kscout     │     ▼  /api, /auth                        │
+              .local)     │  gateway  (reverse proxy)                 │
+                          │     ├── /api/gameplan ─▶ ai-service ──────── Anthropic Claude
+                          │     ├── /api/*        ─▶ team-service      │
+                          │     └── /auth/*       ─▶ auth-service      │
+                          │                                           │
+                          │   auth-service, ai-service ──▶ Postgres   │
+                          │   team-service, ai-service ──▶ Redis      │
+                          └───────────────────────────────────────────┘
 ```
 
-Five independently deployable services, each with its own image, health check, and
-horizontal scaling:
+Five independently deployable app services, each with its own image, health check, and
+horizontal scaling — plus a Postgres and Redis pod backing the stateful pieces:
 
 | Service | Port | Responsibility |
 |---|---|---|
 | `frontend` | 80 | nginx serving the React/Vite SPA |
 | `gateway` | 8080 | Routes `/api/*` and `/auth/*` to the right service (path-preserving) |
-| `team-service` | 3001 | Proxies + caches nba2kapi; injects the API key server-side |
-| `ai-service` | 3002 | Generates the AI game plan via the Anthropic SDK |
-| `auth-service` | 3003 | JWT login backing the dashboard sign-in |
+| `team-service` | 3001 | Proxies + caches (Redis) nba2kapi; injects the API key server-side |
+| `ai-service` | 3002 | Generates the AI game plan via the Anthropic SDK; caches by matchup (Redis) and saves history/usage (Postgres) |
+| `auth-service` | 3003 | Real accounts + JWT login, backed by Postgres |
+| `postgres` | 5432 | Accounts, game plan history, usage tracking (see [Data & caching](#data--caching)) |
+| `redis` | 6379 | Shared cache for `team-service` and `ai-service` |
 
 See [`services/README.md`](services/README.md) for per-service detail and the request flow.
 
@@ -54,10 +62,12 @@ See [`services/README.md`](services/README.md) for per-service detail and the re
 |---|---|
 | Frontend | React + Vite, CSS-variable theming (light default + dark toggle), inline SVG icons |
 | Services | Node.js (ESM) + Express |
+| Data | Postgres (accounts, history, usage) + Redis (nba2kapi/gameplan cache) |
 | AI model | Anthropic Claude (`claude-opus-4-8`) |
 | Player data | nba2kapi.com |
 | Containers | Docker (one image per service) |
 | Orchestration | Kubernetes (Deployments, Services, Ingress, Secret) |
+| Observability | Prometheus + Grafana + Alertmanager (`kube-prometheus-stack`) |
 | CI/CD | GitHub Actions → GitHub Container Registry (GHCR) |
 
 ## Local development
