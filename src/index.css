@@ -13,8 +13,8 @@
   --text-2: #334155;
   --text-muted: #64748b;
   --text-faint: #94a3b8;
-  --accent: #2563eb;
-  --accent-soft: #dbeafe;
+  --accent: #3b6fe0;
+  --accent-soft: #e2eafc;
   --error: #dc2626;
   --error-bg: #fef2f2;
   --error-border: #fecaca;
@@ -22,22 +22,37 @@
   --rank-bronze: #b45309;
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 4px 16px rgba(16, 24, 40, 0.06);
   --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-lift: 0 10px 30px rgba(16, 24, 40, 0.10);
+
+  /* Rounded-corner scale — used consistently instead of one-off radius values */
+  --radius-sm: 9px;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --radius-full: 999px;
+
+  /* Sparing glassmorphism — chrome only (sidebar/topbar), never over data */
+  --glass-bg: rgba(255, 255, 255, 0.68);
+  --glass-border: rgba(255, 255, 255, 0.5);
+
+  /* Skeleton shimmer */
+  --skeleton-base: #e7ebf2;
+  --skeleton-shine: #f5f7fb;
 }
 
 [data-theme='dark'] {
-  --bg: #0d0f14;
-  --surface: #111827;
-  --surface-2: #0f172a;
-  --surface-3: #1a2235;
-  --border: #1e2330;
+  --bg: #0b0d12;
+  --surface: #12161f;
+  --surface-2: #0f1219;
+  --surface-3: #1a2030;
+  --border: #212636;
   --border-strong: #2d3748;
-  --border-faint: #0f1929;
+  --border-faint: #10131b;
   --text: #f1f5f9;
   --text-2: #e2e8f0;
-  --text-muted: #64748b;
-  --text-faint: #94a3b8;
-  --accent: #3b82f6;
-  --accent-soft: #1e3a8a;
+  --text-muted: #7c8aa0;
+  --text-faint: #576076;
+  --accent: #5b8bf0;
+  --accent-soft: #1c2c4d;
   --error: #ef4444;
   --error-bg: #1f0d0d;
   --error-border: #7f1d1d;
@@ -45,6 +60,13 @@
   --rank-bronze: #b45309;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.4);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-lift: 0 10px 30px rgba(0, 0, 0, 0.45);
+
+  --glass-bg: rgba(18, 22, 31, 0.66);
+  --glass-border: rgba(255, 255, 255, 0.06);
+
+  --skeleton-base: #1a2030;
+  --skeleton-shine: #232b40;
 }
 
 body {
@@ -55,4 +77,21 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+button, [role='button'] {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

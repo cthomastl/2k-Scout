@@ -100,6 +100,24 @@ function Spinner({ small, label, center }) {
   )
 }
 
+// Shaped like the roster list it's standing in for — a skeleton makes sense
+// here because we already know exactly what's about to render.
+function RosterSkeleton({ rows = 6 }) {
+  return (
+    <div className="roster-list" aria-hidden="true">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="skeleton-row">
+          <div className="skeleton skeleton-avatar" />
+          <div className="skeleton-lines">
+            <div className="skeleton skeleton-line w-60" />
+            <div className="skeleton skeleton-line w-40" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function StatRow({ label, value }) {
   return (
     <div className="stat-row">
@@ -291,7 +309,7 @@ function TeamPanel({ side, selectedTeam, onTeamChange, teams, roster, loading, e
         </select>
       </div>
 
-      {loading && <Spinner small label="Loading roster…" />}
+      {loading && <RosterSkeleton />}
       {error && <div className="api-error">Error: {error}</div>}
 
       {roster.length > 0 && (
@@ -903,6 +921,16 @@ function TeamRankings({ teams, teamsLoading }) {
   )
 }
 
+function HistorySkeleton({ rows = 4 }) {
+  return (
+    <div className="history-list" aria-hidden="true">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="skeleton skeleton-card" />
+      ))}
+    </div>
+  )
+}
+
 function GameplanHistory({ token }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
@@ -922,7 +950,7 @@ function GameplanHistory({ token }) {
     return () => { cancelled = true }
   }, [token])
 
-  if (loading) return <Spinner center label="Loading history…" />
+  if (loading) return <HistorySkeleton />
   if (error) return <div className="api-error center-loading">Failed to load history: {error}</div>
 
   if (items.length === 0) {

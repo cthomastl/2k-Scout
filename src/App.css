@@ -44,7 +44,7 @@
 
 .team-panel {
   background: var(--surface);
-  border-radius: 12px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   overflow: hidden;
 }
@@ -66,10 +66,10 @@
 
 .team-select {
   width: 100%;
-  padding: 8px 12px;
+  padding: 9px 12px;
   background: var(--border);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   color: var(--text-2);
   font-size: 14px;
   appearance: none;
@@ -77,11 +77,13 @@
   background-repeat: no-repeat;
   background-position: right 12px center;
   cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .team-select:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 /* ── Roster list ── */
@@ -94,10 +96,10 @@
 
 /* ── Player card ── */
 .player-card {
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   overflow: hidden;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s ease;
 }
 
 .player-card.expanded {
@@ -796,6 +798,44 @@
   border-width: 2px;
 }
 
+/* Skeleton loaders — used where we already know the shape of what's coming
+   (a roster list, a team grid) so the placeholder can match it. The AI game
+   plan keeps the spinner instead: a multi-second Claude call isn't "content
+   that's basically ready," so a skeleton there would be a false promise. */
+@keyframes skeleton-shine {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--skeleton-base) 25%, var(--skeleton-shine) 50%, var(--skeleton-base) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shine 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+.skeleton-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.skeleton-lines { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.skeleton-line { height: 10px; }
+.skeleton-line.w-60 { width: 60%; }
+.skeleton-line.w-40 { width: 40%; }
+.skeleton-card {
+  height: 96px;
+  border-radius: var(--radius-lg);
+}
+
 .api-error {
   color: var(--error);
   background: var(--error-bg);
@@ -907,19 +947,28 @@
 .ranking-category {
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 16px;
+  max-height: 420px;
+  overflow-y: auto;
 }
 
+/* Sticky within each card's own scroll area — with 30 teams in a category,
+   the label staying pinned while you scroll the list is worth more here
+   than a page-level sticky element would be. */
 .ranking-category-title {
+  position: sticky;
+  top: -16px;
+  margin: -16px -16px 12px;
+  padding: 16px 16px 8px;
+  background: var(--surface-2);
   font-size: 13px;
   font-weight: 700;
   color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
+  z-index: 1;
 }
 
 .ranking-row {
@@ -929,6 +978,7 @@
   padding: 6px 0;
   border-bottom: 1px solid var(--border-faint);
   font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
 .ranking-row:last-child {
@@ -997,8 +1047,10 @@
 .sidebar {
   width: 230px;
   flex-shrink: 0;
-  background: var(--surface);
-  border-right: 1px solid var(--border);
+  background: var(--glass-bg);
+  border-right: 1px solid var(--glass-border);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
   padding: 20px 14px;
   display: flex;
   flex-direction: column;
@@ -1006,6 +1058,7 @@
   position: sticky;
   top: 0;
   height: 100svh;
+  z-index: 20;
 }
 .sidebar-brand {
   display: flex;
@@ -1026,21 +1079,24 @@
   padding: 10px 12px;
   border: none;
   background: none;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   color: var(--text-muted);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
   text-align: left;
 }
 .sidebar-link:hover {
   background: var(--surface-2);
   color: var(--text);
 }
+.sidebar-link:active {
+  transform: scale(0.98);
+}
 .sidebar-link.active {
-  background: var(--accent);
-  color: #fff;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 .sidebar-logout {
   margin-top: auto;
@@ -1063,17 +1119,20 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 28px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
   position: sticky;
   top: 0;
   z-index: 10;
 }
 .topbar-title {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
   color: var(--text);
-  letter-spacing: -0.3px;
+  letter-spacing: -0.4px;
+  text-wrap: balance;
 }
 .topbar-actions {
   display: flex;
@@ -1086,16 +1145,19 @@
   justify-content: center;
   width: 38px;
   height: 38px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text-2);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
 .theme-toggle:hover {
   color: var(--accent);
   border-color: var(--accent);
+}
+.theme-toggle:active {
+  transform: scale(0.92);
 }
 .topbar-user {
   display: flex;
@@ -1126,17 +1188,18 @@
 }
 
 /* ── Dashboard home ── */
-.dash-welcome { margin-bottom: 24px; }
+.dash-welcome { margin-bottom: 28px; }
 .dash-welcome-title {
-  font-size: 24px;
+  font-size: 30px;
   font-weight: 800;
   color: var(--text);
-  letter-spacing: -0.4px;
+  letter-spacing: -0.6px;
+  text-wrap: balance;
 }
 .dash-welcome-sub {
   color: var(--text-muted);
-  font-size: 14px;
-  margin-top: 4px;
+  font-size: 14.5px;
+  margin-top: 6px;
 }
 .dash-stats-grid {
   display: grid;
@@ -1147,9 +1210,14 @@
 .dash-stat-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   padding: 20px;
   box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.dash-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lift);
 }
 .dash-stat-icon {
   display: inline-flex;
@@ -1157,22 +1225,23 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: 11px;
+  border-radius: var(--radius-sm);
   background: var(--accent-soft);
   color: var(--accent);
   margin-bottom: 14px;
 }
 .dash-stat-value {
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 800;
   color: var(--text);
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 .dash-stat-label {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-2);
-  margin-top: 6px;
+  margin-top: 8px;
 }
 .dash-stat-hint {
   font-size: 12px;
@@ -1190,19 +1259,22 @@
   justify-content: space-between;
   gap: 12px;
   padding: 20px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+  transition: border-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
   box-shadow: var(--shadow-sm);
 }
 .dash-cta:hover {
   border-color: var(--accent);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lift);
+}
+.dash-cta:active {
+  transform: translateY(0) scale(0.99);
 }
 .dash-cta.primary {
   background: var(--accent);
@@ -1231,10 +1303,18 @@
 .history-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   padding: 16px 20px;
   box-shadow: var(--shadow-sm);
   cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+.history-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-lift);
+}
+.history-card:active {
+  transform: scale(0.995);
 }
 .history-card-head {
   display: flex;
@@ -1272,7 +1352,7 @@
 .settings-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   padding: 20px;
   box-shadow: var(--shadow-sm);
 }
@@ -1315,7 +1395,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg);
+  background:
+    radial-gradient(600px circle at 15% 20%, var(--accent-soft), transparent 60%),
+    radial-gradient(500px circle at 85% 80%, var(--accent-soft), transparent 55%),
+    var(--bg);
   padding: 20px;
   position: relative;
 }
@@ -1327,11 +1410,13 @@
 .login-card {
   width: 100%;
   max-width: 380px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 18px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border-radius: var(--radius-lg);
   padding: 32px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-lift);
   display: flex;
   flex-direction: column;
 }
@@ -1362,16 +1447,16 @@
 }
 .login-input {
   padding: 11px 13px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
   background: var(--surface-2);
   color: var(--text);
   font-size: 14px;
   margin-bottom: 16px;
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.login-input:focus { border-color: var(--accent); }
+.login-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .login-error {
   background: var(--error-bg);
   border: 1px solid var(--error-border);
@@ -1382,17 +1467,18 @@
   margin-bottom: 14px;
 }
 .login-btn {
-  padding: 12px;
-  border-radius: 10px;
+  padding: 13px;
+  border-radius: var(--radius-sm);
   border: none;
   background: var(--accent);
   color: #fff;
   font-weight: 700;
   font-size: 14px;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s ease, transform 0.1s ease;
 }
 .login-btn:hover { opacity: 0.92; }
+.login-btn:active { transform: scale(0.98); }
 .login-btn:disabled { opacity: 0.6; cursor: default; }
 .login-demo {
   margin-top: 18px;
