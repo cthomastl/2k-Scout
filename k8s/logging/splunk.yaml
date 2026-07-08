@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: splunk-data
+  namespace: logging
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: splunk
+  namespace: logging
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: splunk
+  template:
+    metadata:
+      labels:
+        app: splunk
+    spec:
+      containers:
+        - name: splunk
+          image: splunk/splunk:latest
+          ports:
+            - name: web
+              containerPort: 8000
+            - name: hec
+              containerPort: 8088
+            - name: mgmt
+              containerPort: 8089
+          env:
+            - name: SPLUNK_START_ARGS
+              value: "--accept-license"
+            - name: SPLUNK_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: splunk-secrets
+                  key: SPLUNK_PASSWORD
+            # Setting this env var makes the container auto-provision a HEC
+            # input using this exact token on first boot — no manual setup
+            # in the web UI needed before Fluent Bit can start sending data.
+            - name: SPLUNK_HEC_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: splunk-secrets
+                  key: SPLUNK_HEC_TOKEN
+          volumeMounts:
+            - name: data
+              mountPath: /opt/splunk/var
+          # Splunk is genuinely heavier than everything else in this repo —
+          # first boot alone can take a couple of minutes. These are workable
+          # single-instance dev numbers, not production sizing.
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1.5Gi
+            limits:
+              cpu: 2
+              memory: 4Gi
+          readinessProbe:
+            httpGet:
+              path: /en-US/account/login
+              port: 8000
+              scheme: HTTPS
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 12
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 120
+            periodSeconds: 20
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: splunk-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: splunk
+  namespace: logging
+  labels:
+    app: splunk
+spec:
+  type: ClusterIP
+  selector:
+    app: splunk
+  ports:
+    - name: web
+      port: 8000
+      targetPort: 8000
+    - name: hec
+      port: 8088
+      targetPort: 8088
+    - name: mgmt
+      port: 8089
+      targetPort: 8089

@@ -190,6 +190,33 @@ ConfigMap labeled `grafana_dashboard: "1"`). It covers the four golden
 signals for each service: services up, request rate, 5xx error rate, and
 p95 latency, plus pod restarts in the `2k-scout` namespace.
 
+### Centralized logging (Splunk)
+
+Metrics answer "is something wrong"; logs answer "what exactly happened."
+`k8s/logging/` deploys a single-instance Splunk (HTTP Event Collector
+enabled) plus a Fluent Bit `DaemonSet` that tails every `2k-scout` pod's
+stdout and ships it in — the log-forwarder pattern most companies actually
+use, rather than instrumenting each service with a vendor SDK directly.
+
+```bash
+cp k8s/logging/secrets.example.yaml k8s/logging/secrets.yaml   # fill in real values
+./k8s/setup-logging.sh
+```
+
+Splunk's first boot is genuinely slow (a couple of minutes) — the script
+waits for it before starting the forwarder, so nothing tries to ship logs
+to a HEC endpoint that isn't up yet.
+
+```bash
+kubectl port-forward svc/splunk -n logging 8000:8000
+```
+
+Open `https://localhost:8000` (self-signed cert — click through the browser
+warning), log in as `admin` / your `SPLUNK_PASSWORD`, and in **Search &
+Reporting** run `index=main` over the last 15 minutes to confirm logs are
+arriving. If nothing shows up, `kubectl logs -n logging daemonset/fluent-bit`
+is the first place to look.
+
 ## CI/CD
 
 `.github/workflows/ci-cd.yml` runs on pushes to `main` and `claude/**`:
