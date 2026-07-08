@@ -111,6 +111,80 @@ data:
               "legendFormat": "{{pod}}"
             }
           ]
+        },
+        {
+          "id": 6,
+          "title": "CPU Usage by Pod (2k-scout namespace)",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "targets": [
+            {
+              "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"2k-scout\", container!=\"\", container!=\"POD\"}[5m])) by (pod)",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short" }
+          }
+        },
+        {
+          "id": 7,
+          "title": "Memory Usage by Pod (2k-scout namespace)",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "targets": [
+            {
+              "expr": "sum(container_memory_working_set_bytes{namespace=\"2k-scout\", container!=\"\", container!=\"POD\"}) by (pod)",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "bytes" }
+          }
+        },
+        {
+          "id": 8,
+          "title": "Node CPU: Requested vs Allocatable",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "description": "The metric that would have caught the Postgres/Redis/Splunk resource crunch early — when 'requested' approaches 'allocatable', new pods start failing to schedule.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "targets": [
+            {
+              "expr": "sum(kube_pod_container_resource_requests{resource=\"cpu\"})",
+              "legendFormat": "requested"
+            },
+            {
+              "expr": "sum(kube_node_status_allocatable{resource=\"cpu\"})",
+              "legendFormat": "allocatable"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short" }
+          }
+        },
+        {
+          "id": 9,
+          "title": "Node Memory: Requested vs Allocatable",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "description": "Same idea for memory — this is the specific number that was maxed out during the Splunk deployment incident.",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "targets": [
+            {
+              "expr": "sum(kube_pod_container_resource_requests{resource=\"memory\"})",
+              "legendFormat": "requested"
+            },
+            {
+              "expr": "sum(kube_node_status_allocatable{resource=\"memory\"})",
+              "legendFormat": "allocatable"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "bytes" }
+          }
         }
       ]
     }

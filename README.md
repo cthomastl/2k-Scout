@@ -186,9 +186,13 @@ monitoring 9090:9090`) to confirm all four services show as `up`.
 
 A starter dashboard ("2K Scout - Service Overview") is auto-provisioned via
 `k8s/monitoring/dashboards-configmap.yaml` (Grafana's sidecar picks up any
-ConfigMap labeled `grafana_dashboard: "1"`). It covers the four golden
-signals for each service: services up, request rate, 5xx error rate, and
-p95 latency, plus pod restarts in the `2k-scout` namespace.
+ConfigMap labeled `grafana_dashboard: "1"`). It covers all four golden
+signals for each service — traffic, errors, latency, and saturation:
+services up, request rate, 5xx error rate, p95 latency, and pod restarts,
+plus CPU/memory usage per pod and node-level CPU/memory requested vs.
+allocatable. That last pair is the panel that would have caught the
+Postgres/Redis/Splunk resource crunch early — when "requested" approaches
+"allocatable," new pods start failing to schedule.
 
 A second dashboard ("2K Scout - AI Cost & Quality",
 `k8s/monitoring/ai-dashboard-configmap.yaml`) covers what the golden signals
