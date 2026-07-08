@@ -190,6 +190,24 @@ ConfigMap labeled `grafana_dashboard: "1"`). It covers the four golden
 signals for each service: services up, request rate, 5xx error rate, and
 p95 latency, plus pod restarts in the `2k-scout` namespace.
 
+A second dashboard ("2K Scout - AI Cost & Quality",
+`k8s/monitoring/ai-dashboard-configmap.yaml`) covers what the golden signals
+above can't see: `ai-service` returning `200 OK` doesn't mean the Claude call
+was cheap, fast, or even complete. It tracks:
+
+- **Estimated spend** — token counts × illustrative per-token pricing
+  (`ai_tokens_total`, `ai_estimated_cost_usd_total` — see the pricing
+  constants in `services/ai-service/index.js` if the model or its price changes)
+- **Cache hit rate** — how often a repeat matchup avoids a Claude call entirely
+- **Truncated responses** — `stop_reason=max_tokens` means the user got a cut-off
+  answer while the request still returned `200 OK`; a normal error-rate panel
+  would never catch this
+- **Claude call latency**, isolated from the rest of the request (DB writes,
+  cache checks) via a dedicated `anthropic_request_duration_seconds` histogram
+- **Errors by category** (`ai_errors_total{type=...}`) — rate-limited vs.
+  overloaded vs. an auth problem vs. our own bug all need different responses,
+  and a generic 5xx count can't tell them apart
+
 ### Centralized logging (Splunk)
 
 Metrics answer "is something wrong"; logs answer "what exactly happened."

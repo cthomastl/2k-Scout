@@ -30,9 +30,10 @@ helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheu
   --set grafana.sidecar.dashboards.label=grafana_dashboard \
   --wait
 
-echo "Applying ServiceMonitors and starter dashboard for the 2K Scout services..."
+echo "Applying ServiceMonitors and dashboards for the 2K Scout services..."
 kubectl apply -f k8s/monitoring/service-monitors.yaml
 kubectl apply -f k8s/monitoring/dashboards-configmap.yaml
+kubectl apply -f k8s/monitoring/ai-dashboard-configmap.yaml
 
 cat <<'EOF'
 

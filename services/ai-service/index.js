@@ -40,6 +40,61 @@ const cacheMisses = new promClient.Counter({
   registers: [register],
 })
 
+// --- AI-specific metrics — a generic HTTP request/error/latency histogram
+// tells you nothing about cost or output quality, and both matter for an
+// LLM-backed endpoint the way they never do for a normal CRUD route. ---
+
+const aiTokensTotal = new promClient.Counter({
+  name: 'ai_tokens_total',
+  help: 'Total tokens consumed by Claude calls, by direction',
+  labelNames: ['direction'], // 'input' | 'output'
+  registers: [register],
+})
+
+// Illustrative per-million-token pricing for claude-opus-4-8 — update if the
+// model or its pricing changes. This is for relative cost tracking/alerting
+// (“spend is trending up”), not meant to reconcile exactly against the
+// Anthropic invoice.
+const PRICE_PER_MILLION_INPUT_TOKENS_USD = 15
+const PRICE_PER_MILLION_OUTPUT_TOKENS_USD = 75
+
+const aiEstimatedCostUsdTotal = new promClient.Counter({
+  name: 'ai_estimated_cost_usd_total',
+  help: 'Estimated cumulative USD spend on Claude calls (see pricing constants in source — approximate, not billing-accurate)',
+  registers: [register],
+})
+
+const anthropicRequestDuration = new promClient.Histogram({
+  name: 'anthropic_request_duration_seconds',
+  help: 'Duration of the Claude API call specifically, isolated from DB writes and cache checks in the same request',
+  buckets: [0.5, 1, 2, 4, 8, 16, 32],
+  registers: [register],
+})
+
+const aiStopReasonTotal = new promClient.Counter({
+  name: 'ai_stop_reason_total',
+  help: 'Claude responses by stop_reason — max_tokens means a truncated answer that still returns HTTP 200',
+  labelNames: ['reason'],
+  registers: [register],
+})
+
+const aiErrorsTotal = new promClient.Counter({
+  name: 'ai_errors_total',
+  help: 'Claude call failures by category — different categories need different responses (back off vs check API key vs our own bug)',
+  labelNames: ['type'],
+  registers: [register],
+})
+
+function classifyAnthropicError(err) {
+  const status = err?.status
+  if (status === 429) return 'rate_limit'
+  if (status === 529) return 'overloaded'
+  if (status === 401 || status === 403) return 'auth'
+  if (status === 400) return 'invalid_request'
+  if (status >= 500) return 'anthropic_server_error'
+  return 'other'
+}
+
 app.use((req, res, next) => {
   const end = httpRequestDuration.startTimer()
   res.on('finish', () => {
@@ -233,11 +288,30 @@ app.post('/api/gameplan', requireAuth, async (req, res) => {
   try {
     const prompt = buildPrompt({ myTeam, opponentTeam, attackTargets, hideTargets, leaveOpen, speedAdvantage, bestMatchups, myKeyPlayers, oppKeyPlayers, opponentStrategy })
 
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-8',
-      max_tokens: 2000,
-      messages: [{ role: 'user', content: prompt }],
-    })
+    const endAnthropicTimer = anthropicRequestDuration.startTimer()
+    let message
+    try {
+      message = await anthropic.messages.create({
+        model: 'claude-opus-4-8',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }],
+      })
+    } catch (err) {
+      aiErrorsTotal.inc({ type: classifyAnthropicError(err) })
+      throw err
+    } finally {
+      endAnthropicTimer()
+    }
+
+    const inputTokens = message.usage?.input_tokens ?? 0
+    const outputTokens = message.usage?.output_tokens ?? 0
+    aiTokensTotal.inc({ direction: 'input' }, inputTokens)
+    aiTokensTotal.inc({ direction: 'output' }, outputTokens)
+    aiEstimatedCostUsdTotal.inc(
+      (inputTokens / 1_000_000) * PRICE_PER_MILLION_INPUT_TOKENS_USD +
+      (outputTokens / 1_000_000) * PRICE_PER_MILLION_OUTPUT_TOKENS_USD
+    )
+    aiStopReasonTotal.inc({ reason: message.stop_reason || 'unknown' })
 
     const textBlock = message.content.find(b => b.type === 'text')
     if (!textBlock) throw new Error('No text block in Claude response')
