@@ -40,6 +40,11 @@ spec:
           env:
             - name: SPLUNK_START_ARGS
               value: "--accept-license"
+            # Newer splunk/splunk images added a second, separate gate on top of
+            # --accept-license: without this var the container refuses to start
+            # at all ("License not accepted, please adjust SPLUNK_GENERAL_TERMS").
+            - name: SPLUNK_GENERAL_TERMS
+              value: "--accept-sgt-current-at-splunk-com"
             - name: SPLUNK_PASSWORD
               valueFrom:
                 secretKeyRef:
