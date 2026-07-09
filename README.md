@@ -212,6 +212,21 @@ was cheap, fast, or even complete. It tracks:
   overloaded vs. an auth problem vs. our own bug all need different responses,
   and a generic 5xx count can't tell them apart
 
+### SLOs & error-budget alerting
+
+Dashboards show what's happening; SLOs decide whether it matters and how
+urgently. `k8s/monitoring/slo-rules.yaml` defines three SLOs (availability,
+fast-endpoint latency, AI game plan latency) as Prometheus recording +
+alerting rules, using Google's multi-window multi-burn-rate pattern —
+alerts require both a short and a long window to be burning error budget
+abnormally fast before firing, split into `page` (wake someone up) and
+`ticket` (handle it later) severities. A third dashboard
+("2K Scout - SLOs & Error Budget",
+`k8s/monitoring/slo-dashboard-configmap.yaml`) shows current compliance and
+budget remaining for each. Full writeup, including how an SRE actually uses
+error-budget burn to make ship/freeze decisions:
+[`docs/SLO.md`](docs/SLO.md).
+
 ### Centralized logging (Splunk)
 
 Metrics answer "is something wrong"; logs answer "what exactly happened."

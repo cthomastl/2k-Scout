@@ -20,20 +20,31 @@ helm repo update >/dev/null
 # serviceMonitorSelectorNilUsesHelmValues=false: without this, the chart's
 # Prometheus only scrapes ServiceMonitors labeled `release: <helm-release>`,
 # so our plain ServiceMonitors (labeled just `app: <service>`) would silently
-# never get scraped.
+# never get scraped. ruleSelectorNilUsesHelmValues=false is the same fix for
+# PrometheusRule — without it the SLO alerting rules would silently never
+# load (the rule also carries a release: label as a second safety net).
+#
+# retention=32d: the SLO rules evaluate rate()/increase() over windows up to
+# 3d (and the dashboard's "compliance" panels want a real 30-day view
+# eventually) — the chart's 10d default would make those queries quietly
+# compute over less data than the window claims, not error out.
 helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
   --namespace monitoring --create-namespace \
   --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
+  --set prometheus.prometheusSpec.ruleSelectorNilUsesHelmValues=false \
+  --set prometheus.prometheusSpec.retention=32d \
   --set grafana.adminPassword=admin \
   --set grafana.sidecar.dashboards.enabled=true \
   --set grafana.sidecar.dashboards.searchNamespace=ALL \
   --set grafana.sidecar.dashboards.label=grafana_dashboard \
   --wait
 
-echo "Applying ServiceMonitors and dashboards for the 2K Scout services..."
+echo "Applying ServiceMonitors, SLO rules, and dashboards for the 2K Scout services..."
 kubectl apply -f k8s/monitoring/service-monitors.yaml
+kubectl apply -f k8s/monitoring/slo-rules.yaml
 kubectl apply -f k8s/monitoring/dashboards-configmap.yaml
 kubectl apply -f k8s/monitoring/ai-dashboard-configmap.yaml
+kubectl apply -f k8s/monitoring/slo-dashboard-configmap.yaml
 
 cat <<'EOF'
 
