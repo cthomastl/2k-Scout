@@ -81,18 +81,25 @@ spec:
             limits:
               cpu: 2
               memory: 4Gi
+          # Liveness/readiness stay disabled until this succeeds once, so a
+          # slow first boot (Ansible + splunkd + KV store + web server init)
+          # can't get killed mid-startup. 40 x 15s = 10 minutes of budget
+          # before Kubernetes gives up and restarts the container.
+          startupProbe:
+            tcpSocket:
+              port: 8000
+            periodSeconds: 15
+            failureThreshold: 40
           readinessProbe:
             httpGet:
               path: /en-US/account/login
               port: 8000
               scheme: HTTPS
-            initialDelaySeconds: 60
             periodSeconds: 15
             failureThreshold: 12
           livenessProbe:
             tcpSocket:
               port: 8000
-            initialDelaySeconds: 120
             periodSeconds: 20
       volumes:
         - name: data
