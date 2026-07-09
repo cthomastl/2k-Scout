@@ -27,14 +27,16 @@ spec:
       labels:
         app: splunk
     spec:
-      # The image's first-boot setup runs its own internal Ansible playbook,
-      # which uses `sudo` (become: true) to configure the instance. That sudo
-      # call goes through PAM, and PAM's account-management check fails under
-      # kind/containerd (works fine under plain `docker run`, which is what
-      # Splunk's own docs assume). Running the container as root sidesteps
-      # the failing PAM check since there's no privilege to escalate to.
+      # The image's first-boot setup runs its own internal Ansible playbook.
+      # Running as root breaks its privilege-escalation assumptions (still
+      # hits a sudo/PAM failure on a later "become" step). Splunk's own
+      # Kubernetes docs specify UID 41812 — the image's built-in "splunk"
+      # user, which is already a member of the "ansible" group and can run
+      # the embedded playbooks via group permissions without sudo at all.
+      # fsGroup matches it so the mounted PVC is group-writable too.
       securityContext:
-        runAsUser: 0
+        runAsUser: 41812
+        fsGroup: 41812
       containers:
         - name: splunk
           image: splunk/splunk:latest
