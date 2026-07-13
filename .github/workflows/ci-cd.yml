@@ -37,7 +37,7 @@ jobs:
       packages: write
     strategy:
       matrix:
-        service: [frontend, gateway, team-service, ai-service, auth-service]
+        service: [gateway, team-service, ai-service, auth-service]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,8 +62,8 @@ jobs:
       - name: Build & push
         uses: docker/build-push-action@v6
         with:
-          context: ${{ matrix.service == 'frontend' && '.' || format('services/{0}', matrix.service) }}
-          file: ${{ matrix.service == 'frontend' && 'Dockerfile.frontend' || format('services/{0}/Dockerfile', matrix.service) }}
+          context: services/${{ matrix.service }}
+          file: services/${{ matrix.service }}/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

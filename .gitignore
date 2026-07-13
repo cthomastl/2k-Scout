@@ -15,6 +15,15 @@ dist-ssr
 lambda.zip
 lambda/package-lock.json
 
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/terraform.tfvars
+terraform/*.tfplan
+# terraform/.terraform.lock.hcl is intentionally NOT ignored — same reason
+# as package-lock.json, it pins exact provider versions for reproducibility.
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

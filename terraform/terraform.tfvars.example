@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars and adjust. Everything here has a working
+# default in variables.tf — you only need this file for values you want to
+# override (region, sizing, your GHCR owner if you forked the repo, etc.)
+
+# aws_region   = "us-east-1"
+# ghcr_owner   = "cthomastl"
+# image_tag    = "latest"
+
+# app_instance_type    = "t3.small"
+# app_min_size         = 2
+# app_max_size         = 4
+# app_desired_capacity = 2
+
+# db_instance_class = "db.t3.micro"
+# db_multi_az       = false
