@@ -106,7 +106,11 @@ spec:
             tcpSocket:
               port: 8000
             periodSeconds: 15
-            failureThreshold: 40
+            # 120 x 15s = 30 min. Bumped from the original 40 (10 min) — on a
+            # laptop sharing CPU with everything else in this repo, first boot
+            # was still going (not stuck, just slow) when the shorter budget
+            # gave up and killed it mid-setup, forcing a restart from scratch.
+            failureThreshold: 120
           readinessProbe:
             httpGet:
               path: /en-US/account/login
