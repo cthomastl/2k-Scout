@@ -111,15 +111,25 @@ docker build -t 2k-scout-ai-service    services/ai-service
 docker build -t 2k-scout-auth-service  services/auth-service
 ```
 
+### Centralized logging (Splunk)
+
+`terraform/splunk.tf` provisions a single self-hosted Splunk EC2 instance (HTTP Event
+Collector enabled), private subnet, reachable only from the app tier. Every app-tier
+container ships its logs there directly via Docker's native `splunk` logging driver —
+no separate Fluent-Bit-style forwarder needed the way a Kubernetes DaemonSet would
+require. Viewing logs (SSM port-forward to the web UI, since there's no public IP or
+open inbound port) is in [`terraform/README.md`](terraform/README.md#viewing-logs-splunk).
+
 ### Observability
 
-Not yet built out for this architecture. `gateway`, `team-service`, `ai-service`, and
-`auth-service` still each expose Prometheus-format metrics at `/metrics` via
-`prom-client`, but nothing in `terraform/` currently scrapes or visualizes them — that
-was cluster-native (`kube-prometheus-stack`) in an earlier, Kubernetes-based version of
-this deployment and doesn't carry over to EC2 as-is. The natural equivalents here would
-be CloudWatch alarms/dashboards, or a small self-hosted Prometheus + Grafana instance;
-worth treating as a deliberate follow-up rather than assuming it's covered.
+Metrics/dashboards/SLOs are not yet built out for this architecture (logs are — see
+above). `gateway`, `team-service`, `ai-service`, and `auth-service` still each expose
+Prometheus-format metrics at `/metrics` via `prom-client`, but nothing in `terraform/`
+currently scrapes or visualizes them — that was cluster-native (`kube-prometheus-stack`)
+in an earlier, Kubernetes-based version of this deployment and doesn't carry over to EC2
+as-is. The natural equivalents here would be CloudWatch alarms/dashboards, or a small
+self-hosted Prometheus + Grafana instance; worth treating as a deliberate follow-up
+rather than assuming it's covered.
 
 ## CI/CD
 

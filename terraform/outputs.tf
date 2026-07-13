@@ -32,3 +32,8 @@ output "asg_name" {
   description = "Auto Scaling Group name — used to trigger an instance refresh when redeploying"
   value       = aws_autoscaling_group.app.name
 }
+
+output "splunk_instance_id" {
+  description = "Instance ID for `aws ssm start-session --target` to reach the Splunk web UI (no public IP, no inbound port open — SSM port forwarding only)"
+  value       = aws_instance.splunk.id
+}

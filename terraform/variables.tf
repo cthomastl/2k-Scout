@@ -100,6 +100,20 @@ variable "ssm_secrets_prefix" {
   default     = "/2k-scout"
 }
 
+# --- Logging (self-hosted Splunk) --------------------------------------------
+
+variable "splunk_instance_type" {
+  description = "EC2 instance type for the Splunk log sink"
+  type        = string
+  default     = "t3.medium"
+}
+
+variable "splunk_data_volume_size" {
+  description = "GiB for Splunk's data volume (the instance's root EBS volume — this is a single non-autoscaled box, not a fleet)"
+  type        = number
+  default     = 30
+}
+
 # --- Container images ---------------------------------------------------------
 
 variable "ghcr_owner" {

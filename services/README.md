@@ -76,7 +76,10 @@ generating and managing the master password rather than this app.
 Every app service exposes `GET /healthz` → `200 {status:'ok'}` and allows CORS
 from all origins. All four also expose `GET /metrics` (Prometheus, via `prom-client`) —
 see the root [README's Observability section](../README.md#observability) for the
-current state of that (not yet wired up to anything in this architecture).
+current state of that (not yet wired up to anything in this architecture). Logs are a
+separate story: stdout/stderr from all four containers ships to a self-hosted Splunk
+instance via Docker's own logging driver, no app code involved — see the root
+[README's Centralized logging section](../README.md#centralized-logging-splunk).
 
 ### Routes
 

@@ -30,16 +30,17 @@ resource "aws_launch_template" "app" {
   }
 
   user_data = base64encode(templatefile("${path.module}/user_data.sh.tpl", {
-    aws_region    = var.aws_region
-    db_endpoint   = aws_db_instance.postgres.address
-    db_port       = aws_db_instance.postgres.port
-    db_name       = var.db_name
-    db_username   = var.db_username
-    db_secret_arn = aws_db_instance.postgres.master_user_secret[0].secret_arn
-    ssm_prefix    = var.ssm_secrets_prefix
-    ghcr_owner    = var.ghcr_owner
-    image_tag     = var.image_tag
-    demo_email    = var.demo_email
+    aws_region     = var.aws_region
+    db_endpoint    = aws_db_instance.postgres.address
+    db_port        = aws_db_instance.postgres.port
+    db_name        = var.db_name
+    db_username    = var.db_username
+    db_secret_arn  = aws_db_instance.postgres.master_user_secret[0].secret_arn
+    ssm_prefix     = var.ssm_secrets_prefix
+    ghcr_owner     = var.ghcr_owner
+    image_tag      = var.image_tag
+    demo_email     = var.demo_email
+    splunk_hec_url = "https://${aws_instance.splunk.private_ip}:8088"
   }))
 
   tag_specifications {

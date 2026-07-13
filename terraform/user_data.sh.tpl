@@ -34,6 +34,7 @@ JWT_SECRET=$(ssm_get JWT_SECRET)
 ANTHROPIC_API_KEY=$(ssm_get ANTHROPIC_API_KEY)
 NBA2K_API_KEY=$(ssm_get NBA2K_API_KEY)
 DEMO_PASSWORD=$(ssm_get DEMO_PASSWORD)
+SPLUNK_HEC_TOKEN=$(ssm_get SPLUNK_HEC_TOKEN)
 
 cat > /opt/2k-scout/.env <<ENV
 DATABASE_URL=postgresql://${db_username}:$${DB_PASSWORD}@${db_endpoint}:${db_port}/${db_name}
@@ -42,6 +43,7 @@ ANTHROPIC_API_KEY=$${ANTHROPIC_API_KEY}
 NBA2K_API_KEY=$${NBA2K_API_KEY}
 DEMO_EMAIL=${demo_email}
 DEMO_PASSWORD=$${DEMO_PASSWORD}
+SPLUNK_HEC_TOKEN=$${SPLUNK_HEC_TOKEN}
 ENV
 chmod 600 /opt/2k-scout/.env
 
@@ -51,16 +53,35 @@ chmod 600 /opt/2k-scout/.env
 # always-cache-miss behavior, so nothing here needs to change to add
 # ElastiCache back later if that tradeoff stops being worth it.
 cat > /opt/2k-scout/docker-compose.yml <<'COMPOSE'
+# splunk-verify-connection: "false" is deliberate — without it, Docker
+# checks HEC connectivity when a container *starts* and refuses to start
+# the container at all if Splunk isn't reachable yet. Logging should never
+# be a hard dependency that can take down the app tier; with this off, a
+# container starts regardless and Docker buffers/retries log delivery in
+# the background. splunk-insecureskipverify is needed because Splunk's HEC
+# uses a self-signed cert by default (same one the web UI warns about).
+x-splunk-logging: &splunk-logging
+  driver: splunk
+  options:
+    splunk-url: "${splunk_hec_url}"
+    splunk-token: "$${SPLUNK_HEC_TOKEN}"
+    splunk-index: "main"
+    splunk-insecureskipverify: "true"
+    splunk-verify-connection: "false"
+    tag: "{{.Name}}"
+
 services:
   team-service:
     image: ghcr.io/${ghcr_owner}/2k-scout-team-service:${image_tag}
     restart: unless-stopped
+    logging: *splunk-logging
     environment:
       NBA2K_API_KEY: $${NBA2K_API_KEY}
 
   ai-service:
     image: ghcr.io/${ghcr_owner}/2k-scout-ai-service:${image_tag}
     restart: unless-stopped
+    logging: *splunk-logging
     environment:
       ANTHROPIC_API_KEY: $${ANTHROPIC_API_KEY}
       JWT_SECRET: $${JWT_SECRET}
@@ -69,6 +90,7 @@ services:
   auth-service:
     image: ghcr.io/${ghcr_owner}/2k-scout-auth-service:${image_tag}
     restart: unless-stopped
+    logging: *splunk-logging
     environment:
       JWT_SECRET: $${JWT_SECRET}
       DEMO_EMAIL: $${DEMO_EMAIL}
@@ -78,6 +100,7 @@ services:
   gateway:
     image: ghcr.io/${ghcr_owner}/2k-scout-gateway:${image_tag}
     restart: unless-stopped
+    logging: *splunk-logging
     ports:
       - "8080:8080"
     environment:
