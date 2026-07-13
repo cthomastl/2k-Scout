@@ -1,0 +1,24 @@
+# Applied after the Dynatrace Operator is installed (see k8s/setup-dynatrace.sh).
+# The operator watches this CR and, from it, creates the actual OneAgent
+# DaemonSet — one privileged pod per node — that ships host, process, and
+# auto-instrumented APM data for every namespace (including 2k-scout) into
+# the Dynatrace environment at spec.apiUrl. Unlike Splunk, there's no
+# in-cluster backend to deploy: the tenant lives outside the cluster, this
+# CR only controls the agent side.
+apiVersion: dynatrace.com/v1beta2
+kind: DynaKube
+metadata:
+  name: dynakube
+  namespace: dynatrace
+spec:
+  # e.g. https://abc12345.live.dynatrace.com/api (SaaS) or
+  # https://<your-domain>/e/<environment-id>/api (Managed).
+  apiUrl: https://ENVIRONMENTID.live.dynatrace.com/api
+  # Name of the Secret (k8s/dynatrace/secrets.yaml) holding apiToken /
+  # dataIngestToken. Defaults to "<DynaKube name>" if omitted, matched here.
+  tokens: dynakube
+  oneAgent:
+    classicFullStack:
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists

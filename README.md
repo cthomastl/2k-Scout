@@ -254,6 +254,35 @@ Reporting** run `index=main` over the last 15 minutes to confirm logs are
 arriving. If nothing shows up, `kubectl logs -n logging daemonset/fluent-bit`
 is the first place to look.
 
+### Infrastructure & APM monitoring (Dynatrace)
+
+Prometheus covers app-level metrics and Splunk covers logs; Dynatrace's
+OneAgent adds full-stack coverage underneath both — host resource usage,
+process topology, and auto-instrumented APM traces through each service,
+without any code changes. Unlike Splunk, Dynatrace has no self-hostable
+backend, so `k8s/dynatrace/` only deploys the agent side (via the Dynatrace
+Operator) reporting into an existing Dynatrace SaaS/Managed environment.
+
+```bash
+cp k8s/dynatrace/secrets.example.yaml k8s/dynatrace/secrets.yaml   # fill in real API token(s)
+# edit k8s/dynatrace/dynakube.yaml: set apiUrl to your Dynatrace environment
+./k8s/setup-dynatrace.sh
+```
+
+The script installs the Dynatrace Operator via Helm, then applies a
+`DynaKube` custom resource; the operator reads that CR and rolls out
+OneAgent as a `DaemonSet` — one privileged pod per node — across the
+cluster.
+
+```bash
+kubectl -n dynatrace get pods -l app.kubernetes.io/name=oneagent -w
+```
+
+Once those pods report `Running`, host, process, and APM data for the
+`2k-scout` namespace should appear in your Dynatrace environment within a
+few minutes under **Infrastructure > Hosts** and **Applications &
+Microservices**.
+
 ## CI/CD
 
 `.github/workflows/ci-cd.yml` runs on pushes to `main` and `claude/**`:
