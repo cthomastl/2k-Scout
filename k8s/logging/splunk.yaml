@@ -27,33 +27,15 @@ spec:
       labels:
         app: splunk
     spec:
-      # The image's first-boot setup runs its own internal Ansible playbook.
-      # Running as root breaks its privilege-escalation assumptions (still
-      # hits a sudo/PAM failure on a later "become" step). Splunk's own
-      # Kubernetes docs specify UID 41812 — the image's built-in "splunk"
-      # user, which is already a member of the "ansible" group and can run
-      # the embedded playbooks via group permissions without sudo at all.
-      # fsGroup matches it so the mounted PVC is group-writable too.
-      securityContext:
-        runAsUser: 41812
-        fsGroup: 41812
-      # fsGroup above only takes effect on volume types kubelet manages
-      # ownership for — it's a no-op on hostPath-backed PVs, which is what
-      # most local dev storage classes (e.g. kind's local-path-provisioner)
-      # actually hand out. Without this, the PVC stays root-owned, the
-      # non-root splunk user can't chown it itself, and Splunk's own
-      # first-boot playbook fails trying to `sudo chown` with no password
-      # configured. Doing the chown here as root, once, before the main
-      # container starts, sidesteps that entirely.
-      initContainers:
-        - name: init-chown-data
-          image: busybox:1.36
-          command: ["sh", "-c", "chown -R 41812:41812 /opt/splunk/var"]
-          securityContext:
-            runAsUser: 0
-          volumeMounts:
-            - name: data
-              mountPath: /opt/splunk/var
+      # Deliberately no pod-level securityContext / runAsUser override here.
+      # The splunk/splunk image's own entrypoint is designed to start as
+      # root and drop privileges to its built-in "splunk" user (UID 41812)
+      # itself internally, fixing ownership on the mounted PVC as part of
+      # that process. Forcing runAsUser: 41812 at the Kubernetes level skips
+      # that internal root-then-drop logic and starts the embedded
+      # first-boot Ansible playbook already unprivileged, which then fails
+      # partway through trying to `sudo chown` its own directories with no
+      # password configured. Let it run as root as the image intends.
       containers:
         - name: splunk
           image: splunk/splunk:latest
