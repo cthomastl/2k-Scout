@@ -39,16 +39,17 @@ spec:
       containers:
         - name: splunk
           image: splunk/splunk:latest
-          # sudo's PAM account-management step writes an audit record over a
-          # netlink socket, which needs AUDIT_WRITE — most container
-          # runtimes (including containerd, what kind uses) drop it by
-          # default. Without it, every `sudo` call in Splunk's embedded
-          # first-boot Ansible playbook fails with "PAM account management
-          # error: Authentication service cannot retrieve authentication
-          # info", regardless of which UID the container runs as.
+          # Splunk's embedded first-boot Ansible playbook calls `sudo` on
+          # every task, and its PAM account-management step needs more than
+          # just AUDIT_WRITE to succeed under containerd's default (much
+          # more restrictive than plain `docker run`'s) capability set —
+          # granting that one capability alone still failed PAM with
+          # "Authentication service cannot retrieve authentication info".
+          # This is a single-instance local dev pod, not production, so
+          # privileged: true (every capability at once) is the pragmatic
+          # fix rather than chasing each missing capability individually.
           securityContext:
-            capabilities:
-              add: ["AUDIT_WRITE"]
+            privileged: true
           ports:
             - name: web
               containerPort: 8000
