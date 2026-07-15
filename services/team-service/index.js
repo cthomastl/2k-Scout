@@ -78,6 +78,7 @@ app.get('/api/*', async (req, res) => {
   cacheMisses.inc()
 
   const upstreamUrl = `${UPSTREAM}${req.originalUrl}`
+  const upstreamStart = Date.now()
 
   try {
     const upstreamRes = await fetch(upstreamUrl, {
@@ -87,15 +88,18 @@ app.get('/api/*', async (req, res) => {
         Accept: 'application/json',
       },
     })
+    const upstreamMs = Date.now() - upstreamStart
 
     if (!upstreamRes.ok) {
       const text = await upstreamRes.text()
+      console.error(`nba2kapi upstream error: GET ${req.originalUrl} -> ${upstreamRes.status} (${upstreamMs}ms)`)
       return res.status(upstreamRes.status).json({
         error: `Upstream error ${upstreamRes.status}`,
         detail: text,
       })
     }
 
+    console.log(`nba2kapi upstream: GET ${req.originalUrl} -> ${upstreamRes.status} (${upstreamMs}ms)`)
     const data = await upstreamRes.json()
     try {
       await redis.setEx(key, CACHE_TTL_SECONDS, JSON.stringify(data))
