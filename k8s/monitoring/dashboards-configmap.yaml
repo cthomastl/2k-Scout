@@ -226,16 +226,16 @@ data:
           "title": "Error Rate % by Service",
           "type": "timeseries",
           "datasource": "${datasource}",
-          "description": "5xx (server-caused) as a percentage of that service's own traffic, not raw count — this is the same ratio the availability SLO burn-rate alerts watch (see the SLOs & Error Budget dashboard for budget context).",
+          "description": "5xx (server-caused) as a percentage of that service's own traffic, not raw count — this is the same ratio the availability SLO burn-rate alerts watch (see the SLOs & Error Budget dashboard for budget context). Clamped to 0-100%: with light test traffic and frequent pod restarts, a rate() counter-reset artifact can otherwise produce a brief nonsense spike (mathematically 5xx/total can never exceed 100%) that blows out the whole axis.",
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
           "targets": [
             {
-              "expr": "sum(rate(http_request_duration_seconds_count{job=~\"gateway|team-service|ai-service|auth-service\", status_code=~\"5..\"}[5m])) by (job) / sum(rate(http_request_duration_seconds_count{job=~\"gateway|team-service|ai-service|auth-service\"}[5m])) by (job)",
+              "expr": "clamp_max(sum(rate(http_request_duration_seconds_count{job=~\"gateway|team-service|ai-service|auth-service\", status_code=~\"5..\"}[5m])) by (job) / sum(rate(http_request_duration_seconds_count{job=~\"gateway|team-service|ai-service|auth-service\"}[5m])) by (job), 1)",
               "legendFormat": "{{job}}"
             }
           ],
           "fieldConfig": {
-            "defaults": { "unit": "percentunit" }
+            "defaults": { "unit": "percentunit", "min": 0, "max": 1 }
           }
         },
         {
