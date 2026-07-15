@@ -28,10 +28,28 @@ data:
       "panels": [
         {
           "id": 1,
+          "title": "Logs",
+          "type": "text",
+          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+          "options": {
+            "mode": "markdown",
+            "content": "Application logs (every `2k-scout` pod's stdout, forwarded by Fluent Bit) live in **Splunk** — Grafana has no log datasource wired up here, that's a separate product on purpose. `kubectl port-forward svc/splunk -n logging 8000:8000`, open `https://localhost:8000`, log in, then **Search & Reporting** → `index=main`. See also: [SLOs & Error Budget](/d/2k-scout-slo) · [AI Cost & Quality](/d/2k-scout-ai)."
+          }
+        },
+        {
+          "id": 2,
+          "title": "Traffic",
+          "type": "row",
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 3 },
+          "panels": []
+        },
+        {
+          "id": 3,
           "title": "Services Up",
           "type": "stat",
           "datasource": "${datasource}",
-          "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 4 },
           "targets": [
             {
               "expr": "sum(up{job=~\"gateway|team-service|ai-service|auth-service\"})",
@@ -55,40 +73,107 @@ data:
           }
         },
         {
-          "id": 2,
-          "title": "Request Rate (req/s by service)",
+          "id": 4,
+          "title": "Total Request Rate (req/s)",
+          "type": "stat",
+          "datasource": "${datasource}",
+          "description": "Demand context for every other panel on this dashboard — 5% errors means something very different at 2 req/s (one dev testing) than at 2000 req/s.",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 4 },
+          "targets": [
+            {
+              "expr": "sum(rate(http_request_duration_seconds_count{job=~\"gateway|team-service|ai-service|auth-service\"}[5m]))",
+              "legendFormat": "req/s"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "reqps" }
+          }
+        },
+        {
+          "id": 5,
+          "title": "Request Rate by Service",
           "type": "timeseries",
           "datasource": "${datasource}",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 4 },
           "targets": [
             {
               "expr": "sum(rate(http_request_duration_seconds_count[5m])) by (job)",
               "legendFormat": "{{job}}"
             }
-          ]
-        },
-        {
-          "id": 3,
-          "title": "Error Rate (5xx req/s by service)",
-          "type": "timeseries",
-          "datasource": "${datasource}",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
-          "targets": [
-            {
-              "expr": "sum(rate(http_request_duration_seconds_count{status_code=~\"5..\"}[5m])) by (job)",
-              "legendFormat": "{{job}}"
-            }
           ],
           "fieldConfig": {
-            "defaults": { "color": { "mode": "fixed", "fixedColor": "red" } }
+            "defaults": { "unit": "reqps" }
           }
         },
         {
-          "id": 4,
-          "title": "P95 Latency (seconds by service)",
+          "id": 6,
+          "title": "Latency",
+          "type": "row",
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 10 },
+          "panels": []
+        },
+        {
+          "id": 7,
+          "title": "p50 / p95 / p99 Latency (all services)",
           "type": "timeseries",
           "datasource": "${datasource}",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "description": "Percentiles, not an average — p50 is the typical request, p99 is what your worst-off users see. A flat p50 with a climbing p99 is a real, hidden problem an average would completely mask.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 11 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=~\"gateway|team-service|ai-service|auth-service\"}[5m])) by (le))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~\"gateway|team-service|ai-service|auth-service\"}[5m])) by (le))",
+              "legendFormat": "p95"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=~\"gateway|team-service|ai-service|auth-service\"}[5m])) by (le))",
+              "legendFormat": "p99"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "s" }
+          }
+        },
+        {
+          "id": 8,
+          "title": "Successful vs. Failed Request Latency (p95)",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "description": "A fast error is not the same problem as a slow success — averaging them together hides both. 'failed' is 4xx+5xx responses; 'successful' is 2xx/3xx. A slow success p95 usually means real backend/DB/downstream latency; a fast-failing error usually means validation or auth rejecting requests early. Watch for the failed line dropping toward zero — that can mean errors are being rejected so fast they're barely being timed at all, which is its own signal.",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 11 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~\"gateway|team-service|ai-service|auth-service\", status_code=~\"2..|3..\"}[5m])) by (le))",
+              "legendFormat": "successful (2xx/3xx)"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~\"gateway|team-service|ai-service|auth-service\", status_code=~\"4..|5..\"}[5m])) by (le))",
+              "legendFormat": "failed (4xx/5xx)"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": { "lineStyle": { "fill": "solid" } }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "failed (4xx/5xx)" },
+                "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
+              }
+            ]
+          }
+        },
+        {
+          "id": 9,
+          "title": "p95 Latency by Service",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
           "targets": [
             {
               "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, job))",
@@ -100,24 +185,104 @@ data:
           }
         },
         {
-          "id": 5,
-          "title": "Pod Restarts (2k-scout namespace)",
-          "type": "timeseries",
+          "id": 10,
+          "title": "Apdex Score by Service",
+          "type": "bargauge",
           "datasource": "${datasource}",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "description": "Satisfied <= 500ms (matches the fast-endpoint latency SLO), tolerating <= 2.5s, frustrated beyond that. 1.0 = every request satisfied. ai-service will read structurally lower here since /api/gameplan is dominated by Claude generation time, not a bug — same reason it's excluded from the fast-latency SLO and gets its own AI Claude Latency SLO instead.",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
           "targets": [
             {
-              "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"2k-scout\"}[15m])) by (pod)",
-              "legendFormat": "{{pod}}"
+              "expr": "(sum(rate(http_request_duration_seconds_bucket{job=~\"gateway|team-service|ai-service|auth-service\", le=\"0.5\"}[5m])) by (job) + (sum(rate(http_request_duration_seconds_bucket{job=~\"gateway|team-service|ai-service|auth-service\", le=\"2.5\"}[5m])) by (job) - sum(rate(http_request_duration_seconds_bucket{job=~\"gateway|team-service|ai-service|auth-service\", le=\"0.5\"}[5m])) by (job)) / 2) / sum(rate(http_request_duration_seconds_count{job=~\"gateway|team-service|ai-service|auth-service\"}[5m])) by (job)",
+              "legendFormat": "{{job}}"
             }
-          ]
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 0.7 },
+                  { "color": "green", "value": 0.94 }
+                ]
+              }
+            }
+          }
         },
         {
-          "id": 6,
+          "id": 11,
+          "title": "Errors",
+          "type": "row",
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+          "panels": []
+        },
+        {
+          "id": 12,
+          "title": "Error Rate % by Service",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "description": "5xx (server-caused) as a percentage of that service's own traffic, not raw count — this is the same ratio the availability SLO burn-rate alerts watch (see the SLOs & Error Budget dashboard for budget context).",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "targets": [
+            {
+              "expr": "sum(rate(http_request_duration_seconds_count{job=~\"gateway|team-service|ai-service|auth-service\", status_code=~\"5..\"}[5m])) by (job) / sum(rate(http_request_duration_seconds_count{job=~\"gateway|team-service|ai-service|auth-service\"}[5m])) by (job)",
+              "legendFormat": "{{job}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percentunit" }
+          }
+        },
+        {
+          "id": 13,
+          "title": "Error Rate by Type: 4xx vs 5xx (all services)",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "description": "Very different signals — 4xx is client-caused (bad input, expired auth token, calling an endpoint wrong) and rarely means the service itself is broken; 5xx is server-caused and is what the availability SLO actually tracks. A 4xx spike with flat 5xx usually points at the frontend or a client integration, not this backend.",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "targets": [
+            {
+              "expr": "sum(rate(http_request_duration_seconds_count{job=~\"gateway|team-service|ai-service|auth-service\", status_code=~\"4..\"}[5m]))",
+              "legendFormat": "4xx (client)"
+            },
+            {
+              "expr": "sum(rate(http_request_duration_seconds_count{job=~\"gateway|team-service|ai-service|auth-service\", status_code=~\"5..\"}[5m]))",
+              "legendFormat": "5xx (server)"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "reqps" },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "5xx (server)" },
+                "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
+              },
+              {
+                "matcher": { "id": "byName", "options": "4xx (client)" },
+                "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }]
+              }
+            ]
+          }
+        },
+        {
+          "id": 14,
+          "title": "Saturation",
+          "type": "row",
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+          "panels": []
+        },
+        {
+          "id": 15,
           "title": "CPU Usage by Pod (2k-scout namespace)",
           "type": "timeseries",
           "datasource": "${datasource}",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 37 },
           "targets": [
             {
               "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"2k-scout\", container!=\"\", container!=\"POD\"}[5m])) by (pod)",
@@ -129,11 +294,11 @@ data:
           }
         },
         {
-          "id": 7,
+          "id": 16,
           "title": "Memory Usage by Pod (2k-scout namespace)",
           "type": "timeseries",
           "datasource": "${datasource}",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 37 },
           "targets": [
             {
               "expr": "sum(container_memory_working_set_bytes{namespace=\"2k-scout\", container!=\"\", container!=\"POD\"}) by (pod)",
@@ -145,12 +310,12 @@ data:
           }
         },
         {
-          "id": 8,
+          "id": 17,
           "title": "Node CPU: Requested vs Allocatable",
           "type": "timeseries",
           "datasource": "${datasource}",
-          "description": "The metric that would have caught the Postgres/Redis/Splunk resource crunch early — when 'requested' approaches 'allocatable', new pods start failing to schedule.",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "description": "The metric that would have caught the Postgres/Redis/Splunk resource crunch early — when 'requested' approaches 'allocatable', new pods start failing to schedule. Things generally degrade before they fully fail; this is the early-warning line, not the outage itself.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 45 },
           "targets": [
             {
               "expr": "sum(kube_pod_container_resource_requests{resource=\"cpu\"})",
@@ -166,12 +331,12 @@ data:
           }
         },
         {
-          "id": 9,
+          "id": 18,
           "title": "Node Memory: Requested vs Allocatable",
           "type": "timeseries",
           "datasource": "${datasource}",
           "description": "Same idea for memory — this is the specific number that was maxed out during the Splunk deployment incident.",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 45 },
           "targets": [
             {
               "expr": "sum(kube_pod_container_resource_requests{resource=\"memory\"})",
@@ -184,6 +349,82 @@ data:
           ],
           "fieldConfig": {
             "defaults": { "unit": "bytes" }
+          }
+        },
+        {
+          "id": 19,
+          "title": "Node Disk I/O",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "description": "Node-wide (this is a single-node kind cluster, so 'node' and 'cluster' are the same box), from node-exporter. Rising I/O time with flat request volume is often the first sign of a saturated disk before latency or errors move at all.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 53 },
+          "targets": [
+            {
+              "expr": "sum(rate(node_disk_io_time_seconds_total[5m])) by (instance)",
+              "legendFormat": "{{instance}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percentunit" }
+          }
+        },
+        {
+          "id": 20,
+          "title": "Node Network Throughput",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 53 },
+          "targets": [
+            {
+              "expr": "sum(rate(node_network_receive_bytes_total{device!=\"lo\"}[5m])) by (instance)",
+              "legendFormat": "{{instance}} rx"
+            },
+            {
+              "expr": "sum(rate(node_network_transmit_bytes_total{device!=\"lo\"}[5m])) by (instance)",
+              "legendFormat": "{{instance}} tx"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "Bps" }
+          }
+        },
+        {
+          "id": 21,
+          "title": "Kubernetes",
+          "type": "row",
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 61 },
+          "panels": []
+        },
+        {
+          "id": 22,
+          "title": "Pod Restarts (2k-scout namespace)",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "description": "Crash-looping pods. A single restart after a deploy is normal; a climbing count on one pod while the rest are flat is the thing to chase.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 62 },
+          "targets": [
+            {
+              "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"2k-scout\"}[15m])) by (pod)",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "id": 23,
+          "title": "Readiness / Liveness Probe Failure Rate",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "description": "From kubelet's own prober_probe_total metric — tells you when Kubernetes thinks a pod is unhealthy (or vice versa: a pod that's actually struggling but still passing probes won't show up here, only in the latency/error panels above). Requires the kubelet ServiceMonitor kube-prometheus-stack installs by default; if this stays empty on a real cluster while pods are visibly restarting, check that kubelet metrics are actually being scraped.",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 62 },
+          "targets": [
+            {
+              "expr": "sum(rate(prober_probe_total{namespace=\"2k-scout\", result=\"failed\"}[5m])) by (pod, probe_type)",
+              "legendFormat": "{{pod}} ({{probe_type}})"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short" }
           }
         }
       ]
