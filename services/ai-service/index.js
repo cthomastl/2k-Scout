@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import morgan from 'morgan'
 import Anthropic from '@anthropic-ai/sdk'
 import promClient from 'prom-client'
 import jwt from 'jsonwebtoken'
@@ -16,6 +17,7 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 const app = express()
 app.use(cors())
+app.use(morgan('combined'))
 app.use(express.json({ limit: '1mb' }))
 
 const register = new promClient.Registry()

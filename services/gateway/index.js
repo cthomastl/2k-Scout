@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import morgan from 'morgan'
 import { createProxyMiddleware } from 'http-proxy-middleware'
 import client from 'prom-client'
 
@@ -10,6 +11,10 @@ const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://auth-service:30
 
 const app = express()
 app.use(cors())
+// Same combined format nginx (frontend) logs in by default — one
+// consistent, greppable log shape across every pod in Loki instead of
+// frontend being the only service with per-request logs.
+app.use(morgan('combined'))
 
 const register = new client.Registry()
 client.collectDefaultMetrics({ register })

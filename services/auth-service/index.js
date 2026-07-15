@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import morgan from 'morgan'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import pg from 'pg'
@@ -13,6 +14,7 @@ const DATABASE_URL = process.env.DATABASE_URL
 
 const app = express()
 app.use(cors())
+app.use(morgan('combined'))
 app.use(express.json())
 
 const register = new client.Registry()

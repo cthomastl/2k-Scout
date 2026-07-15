@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import morgan from 'morgan'
 import client from 'prom-client'
 import { createClient } from 'redis'
 
@@ -11,6 +12,7 @@ const CACHE_TTL_SECONDS = 60 * 60 // 1 hour
 
 const app = express()
 app.use(cors())
+app.use(morgan('combined'))
 
 const register = new client.Registry()
 client.collectDefaultMetrics({ register })
