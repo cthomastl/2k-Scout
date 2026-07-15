@@ -1,45 +1,49 @@
 #!/usr/bin/env bash
-# Installs a single-instance Splunk (HEC enabled) and a Fluent Bit DaemonSet
-# that tails every 2k-scout pod's stdout logs and ships them in — the
-# forwarder pattern most real companies actually use, rather than
-# instrumenting every service with a vendor SDK directly.
+# Installs Loki (single-process, filesystem storage) and a Fluent Bit
+# DaemonSet that tails every 2k-scout pod's stdout logs and ships them in
+# — the log-forwarder pattern most companies actually use, rather than
+# instrumenting each service with a vendor SDK directly. Logs show up
+# inside Grafana's Explore view (same Grafana as k8s/setup-monitoring.sh),
+# no separate login or port-forward needed once both are installed.
 
 set -euo pipefail
 
 kubectl apply -f k8s/logging/namespace.yaml
-
-if [ ! -f k8s/logging/secrets.yaml ]; then
-  echo "k8s/logging/secrets.yaml not found." >&2
-  echo "Run: cp k8s/logging/secrets.example.yaml k8s/logging/secrets.yaml" >&2
-  echo "Fill in real values, then re-run this script." >&2
-  exit 1
-fi
-
-kubectl apply -f k8s/logging/secrets.yaml
 kubectl apply -f k8s/logging/fluent-bit-rbac.yaml
 kubectl apply -f k8s/logging/fluent-bit-configmap.yaml
-kubectl apply -f k8s/logging/splunk.yaml
+kubectl apply -f k8s/logging/loki.yaml
 
-echo "Waiting for Splunk to become ready — first boot commonly takes a couple of minutes..."
+echo "Waiting for Loki to become ready..."
 kubectl wait --namespace logging \
-  --for=condition=ready pod \
-  --selector=app=splunk \
-  --timeout=300s
+  --for=condition=available deployment/loki \
+  --timeout=120s
 
-# Applied after Splunk is ready so Fluent Bit isn't retrying against a HEC
+# Applied after Loki is ready so Fluent Bit isn't retrying against an
 # endpoint that doesn't exist yet.
 kubectl apply -f k8s/logging/fluent-bit-daemonset.yaml
+
+# Only wired into Grafana if the monitoring stack is already installed —
+# this ConfigMap lives in the `logging` namespace, which is fine (the
+# sidecar's searchNamespace=ALL finds it either way), but Grafana itself
+# has to exist first for the sidecar to be running at all.
+if kubectl get deployment -n monitoring kube-prometheus-stack-grafana >/dev/null 2>&1; then
+  kubectl apply -f k8s/logging/grafana-loki-datasource.yaml
+  echo "Loki datasource applied — Grafana's sidecar will pick it up within ~30s."
+else
+  echo "Note: monitoring stack not found yet (k8s/setup-monitoring.sh) —" >&2
+  echo "run that first, then: kubectl apply -f k8s/logging/grafana-loki-datasource.yaml" >&2
+fi
 
 cat <<'EOF'
 
 Logging stack ready. Next steps:
 
-  # Splunk web UI — log in as admin / <your SPLUNK_PASSWORD>
-  kubectl port-forward svc/splunk -n logging 8000:8000
-  open https://localhost:8000
+  kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 3000:80
+  open http://localhost:3000
 
-In Splunk: Search & Reporting app -> run `index=main` over "Last 15 minutes"
-to confirm log events are arriving from the 2k-scout namespace. If nothing
+In Grafana: Explore -> select the "Loki" datasource -> run
+  {namespace="2k-scout"}
+over "Last 15 minutes" to confirm log events are arriving. If nothing
 shows up, check the forwarder:
 
   kubectl logs -n logging daemonset/fluent-bit --tail=50

@@ -11,8 +11,8 @@ data:
         Parsers_File  parsers.conf
 
     # Scoped to the 2k-scout namespace's containers only — shipping every
-    # kube-system log to Splunk would be noisy and, in a real paid Splunk
-    # deployment, expensive. Real teams scope ingestion deliberately.
+    # kube-system log would be noisy and hides the signal you actually
+    # want. Real teams scope ingestion deliberately.
     [INPUT]
         Name              tail
         Path              /var/log/containers/*_2k-scout_*.log
@@ -32,11 +32,9 @@ data:
         K8S-Logging.Exclude On
 
     [OUTPUT]
-        Name             splunk
-        Match            kube.*
-        Host             splunk.logging.svc.cluster.local
-        Port             8088
-        Splunk_Token     ${SPLUNK_HEC_TOKEN}
-        TLS              On
-        TLS.Verify       Off
-        Splunk_Send_Raw  Off
+        Name                    loki
+        Match                   kube.*
+        Host                    loki.logging.svc.cluster.local
+        Port                    3100
+        Labels                  job=fluent-bit
+        Auto_Kubernetes_Labels  On

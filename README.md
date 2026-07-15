@@ -227,32 +227,32 @@ budget remaining for each. Full writeup, including how an SRE actually uses
 error-budget burn to make ship/freeze decisions:
 [`docs/SLO.md`](docs/SLO.md).
 
-### Centralized logging (Splunk)
+### Centralized logging (Loki)
 
 Metrics answer "is something wrong"; logs answer "what exactly happened."
-`k8s/logging/` deploys a single-instance Splunk (HTTP Event Collector
-enabled) plus a Fluent Bit `DaemonSet` that tails every `2k-scout` pod's
-stdout and ships it in — the log-forwarder pattern most companies actually
-use, rather than instrumenting each service with a vendor SDK directly.
+`k8s/logging/` deploys Loki (single-process, filesystem storage) plus a
+Fluent Bit `DaemonSet` that tails every `2k-scout` pod's stdout and ships
+it in — the log-forwarder pattern most companies actually use, rather
+than instrumenting each service with a vendor SDK directly.
 
 ```bash
-cp k8s/logging/secrets.example.yaml k8s/logging/secrets.yaml   # fill in real values
 ./k8s/setup-logging.sh
 ```
 
-Splunk's first boot is genuinely slow (a couple of minutes) — the script
-waits for it before starting the forwarder, so nothing tries to ship logs
-to a HEC endpoint that isn't up yet.
+No secrets file needed — Loki runs with `auth_enabled: false` for local
+dev. If `k8s/setup-monitoring.sh` has already run, the script also wires
+Loki into Grafana as a datasource automatically; if not, it prints a
+reminder to apply `k8s/logging/grafana-loki-datasource.yaml` once it has.
 
 ```bash
-kubectl port-forward svc/splunk -n logging 8000:8000
+kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 3000:80
 ```
 
-Open `https://localhost:8000` (self-signed cert — click through the browser
-warning), log in as `admin` / your `SPLUNK_PASSWORD`, and in **Search &
-Reporting** run `index=main` over the last 15 minutes to confirm logs are
-arriving. If nothing shows up, `kubectl logs -n logging daemonset/fluent-bit`
-is the first place to look.
+Open `http://localhost:3000` (`admin` / `admin`), go to **Explore**, pick
+the **Loki** datasource, and run `{namespace="2k-scout"}` over the last 15
+minutes to confirm logs are arriving — same Grafana as the dashboards
+above, no separate login. If nothing shows up,
+`kubectl logs -n logging daemonset/fluent-bit` is the first place to look.
 
 ## CI/CD
 

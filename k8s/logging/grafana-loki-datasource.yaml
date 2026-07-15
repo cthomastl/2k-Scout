@@ -1,0 +1,25 @@
+# Picked up by kube-prometheus-stack's Grafana sidecar (the
+# grafana.sidecar.datasources.* settings enabled in setup-monitoring.sh),
+# the same mechanism the dashboard ConfigMaps use, just for datasources
+# instead of dashboards. Lives here with the rest of the logging stack
+# rather than under k8s/monitoring/ since it's really "wire logging into
+# Grafana," not a Prometheus/dashboard concern — searchNamespace=ALL
+# means the sidecar finds it regardless of which namespace it's applied
+# in, so it doesn't need to sit in Grafana's own `monitoring` namespace.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-datasource
+  namespace: logging
+  labels:
+    grafana_datasource: "1"
+data:
+  loki-datasource.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki.logging.svc.cluster.local:3100
+        isDefault: false
+        editable: false

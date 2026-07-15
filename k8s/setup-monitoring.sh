@@ -37,6 +37,8 @@ helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheu
   --set grafana.sidecar.dashboards.enabled=true \
   --set grafana.sidecar.dashboards.searchNamespace=ALL \
   --set grafana.sidecar.dashboards.label=grafana_dashboard \
+  --set grafana.sidecar.datasources.enabled=true \
+  --set grafana.sidecar.datasources.searchNamespace=ALL \
   --wait
 
 echo "Applying ServiceMonitors, SLO rules, and dashboards for the 2K Scout services..."

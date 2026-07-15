@@ -1,0 +1,135 @@
+# Hand-rolled rather than the official Helm chart — the loki chart's
+# default deployment mode spins up several components (read/write/backend
+# + a gateway), which is way more than a single-instance local dev setup
+# needs and reintroduces the same "too many pods fighting over one
+# laptop's CPU" problem this repo already hit once. Loki itself is a
+# plain static Go binary with no install-time orchestration step (unlike
+# Splunk's embedded Ansible playbook), so a minimal single-process config
+# is both sufficient and genuinely simple.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-config
+  namespace: logging
+data:
+  loki-config.yaml: |
+    auth_enabled: false
+    server:
+      http_listen_port: 3100
+    common:
+      path_prefix: /loki
+      storage:
+        filesystem:
+          chunks_directory: /loki/chunks
+          rules_directory: /loki/rules
+      replication_factor: 1
+      ring:
+        kvstore:
+          store: inmemory
+    schema_config:
+      configs:
+        - from: 2020-10-24
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+    limits_config:
+      # Local dev — keep the PVC small and bounded rather than growing
+      # forever.
+      retention_period: 24h
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: loki-data
+  namespace: logging
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loki
+  namespace: logging
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: loki
+  template:
+    metadata:
+      labels:
+        app: loki
+    spec:
+      # The grafana/loki image runs as a non-root UID by default. kind's
+      # local-path-provisioner PVCs are hostPath-backed, and Kubernetes'
+      # fsGroup mechanism doesn't apply ownership fixes to hostPath volumes
+      # — the exact issue that cost a long debugging session with Splunk's
+      # PVC. Loki has no sudo/Ansible step to trip over the way Splunk did,
+      # so just running it as root sidesteps the ownership question
+      # entirely instead of fighting it.
+      securityContext:
+        runAsUser: 0
+      containers:
+        - name: loki
+          image: grafana/loki:3.1.1
+          args:
+            - -config.file=/etc/loki/loki-config.yaml
+          ports:
+            - name: http
+              containerPort: 3100
+          volumeMounts:
+            - name: config
+              mountPath: /etc/loki
+            - name: data
+              mountPath: /loki
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3100
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: 3100
+            initialDelaySeconds: 10
+            periodSeconds: 15
+      volumes:
+        - name: config
+          configMap:
+            name: loki-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: loki-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki
+  namespace: logging
+  labels:
+    app: loki
+spec:
+  type: ClusterIP
+  selector:
+    app: loki
+  ports:
+    - name: http
+      port: 3100
+      targetPort: 3100

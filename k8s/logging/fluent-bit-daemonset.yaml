@@ -23,12 +23,6 @@ spec:
       containers:
         - name: fluent-bit
           image: fluent/fluent-bit:3.1
-          env:
-            - name: SPLUNK_HEC_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: splunk-secrets
-                  key: SPLUNK_HEC_TOKEN
           volumeMounts:
             - name: varlog
               mountPath: /var/log
