@@ -33,7 +33,7 @@ data:
           "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
           "options": {
             "mode": "markdown",
-            "content": "Application logs (every `2k-scout` pod's stdout, forwarded by Fluent Bit) live in **Loki**, queryable right here in Grafana — no separate login. Go to **Explore** (left sidebar), pick the **Loki** datasource, and run `{namespace=\"2k-scout\"}`. See also: [SLOs & Error Budget](/d/2k-scout-slo) · [AI Cost & Quality](/d/2k-scout-ai)."
+            "content": "Application logs (every `2k-scout` pod's stdout, forwarded by Fluent Bit) live in **Loki**, queryable right here in Grafana — no separate login. Go to **Explore** (left sidebar), pick the **Loki** datasource, and run `{job=\"fluent-bit\"}` (the input is already scoped to 2k-scout containers only, so there's no separate namespace label to filter on) — add `| json | kubernetes_container_name=\"gateway\"` to narrow to one service. See also: [SLOs & Error Budget](/d/2k-scout-slo) · [AI Cost & Quality](/d/2k-scout-ai)."
           }
         },
         {

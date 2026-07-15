@@ -31,6 +31,14 @@ data:
         K8S-Logging.Parser  On
         K8S-Logging.Exclude On
 
+    # Auto_Kubernetes_Labels only promotes the pod's own K8s labels (app,
+    # pod-template-hash) to Loki labels — it does NOT promote namespace/pod/
+    # container from the kubernetes filter's metadata, despite the name.
+    # Label_Keys does that explicitly, so {pod_name="..."} and
+    # {container_name="..."} work as real label queries instead of needing
+    # a `| json` parse stage every time. namespace itself is deliberately
+    # not promoted — the INPUT above already only tails 2k-scout containers,
+    # so every line in this stream is already scoped to it.
     [OUTPUT]
         Name                    loki
         Match                   kube.*
@@ -38,3 +46,4 @@ data:
         Port                    3100
         Labels                  job=fluent-bit
         Auto_Kubernetes_Labels  On
+        Label_Keys              $kubernetes['pod_name'],$kubernetes['container_name']

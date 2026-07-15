@@ -249,10 +249,14 @@ kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 3000:80
 ```
 
 Open `http://localhost:3000` (`admin` / `admin`), go to **Explore**, pick
-the **Loki** datasource, and run `{namespace="2k-scout"}` over the last 15
+the **Loki** datasource, and run `{job="fluent-bit"}` over the last 15
 minutes to confirm logs are arriving — same Grafana as the dashboards
-above, no separate login. If nothing shows up,
-`kubectl logs -n logging daemonset/fluent-bit` is the first place to look.
+above, no separate login. (The Fluent Bit `[INPUT]` already only tails
+`2k-scout` containers, so there's no separate `namespace` label to filter
+on; narrow to one service with
+`{job="fluent-bit"} | json | kubernetes_container_name="gateway"`.) If
+nothing shows up, `kubectl logs -n logging daemonset/fluent-bit` is the
+first place to look.
 
 ## CI/CD
 

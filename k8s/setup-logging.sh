@@ -42,9 +42,12 @@ Logging stack ready. Next steps:
   open http://localhost:3000
 
 In Grafana: Explore -> select the "Loki" datasource -> run
-  {namespace="2k-scout"}
-over "Last 15 minutes" to confirm log events are arriving. If nothing
-shows up, check the forwarder:
+  {job="fluent-bit"}
+over "Last 15 minutes" to confirm log events are arriving (the INPUT
+above already only tails 2k-scout containers, so there's no separate
+namespace label to filter on). Narrow to one service with:
+  {job="fluent-bit"} | json | kubernetes_container_name="gateway"
+If nothing shows up, check the forwarder:
 
   kubectl logs -n logging daemonset/fluent-bit --tail=50
 EOF
