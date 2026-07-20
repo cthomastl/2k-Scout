@@ -20,12 +20,15 @@ function buildPrompt({
   pnrGuidance, theirAttackTargets, theirHideTargets, myPlayersLeftOpen, theirSpeedAdvantage, topDefenders,
 }) {
   const fmt = lines => lines.length ? lines.join('\n') : '  - No data'
+  // hideTargets/attackTargets/theirAttackTargets/theirHideTargets carry `badges` as raw
+  // {name, tier} objects (not the pre-formatted strings myKeyPlayers/oppKeyPlayers use).
+  const badgeNote = p => (p.badges?.length ? ` — badged up (${p.badges.map(b => b.name).join(', ')})` : '')
 
   const attackLines = fmt(attackTargets.map(p =>
     `  - ${p.name} [${(p.positions||[]).join('/')}] Per. Def ${p.perim} / Int. Def ${p.interior} → ${p.attackHint}`
   ))
   const hideLines = fmt(hideTargets.map(p =>
-    `  - ${p.name} (Perimeter Defense ${p.perim})`
+    `  - ${p.name} (Perimeter Defense ${p.perim})${badgeNote(p)}`
   ))
   const leaveLines = fmt(leaveOpen.map(p =>
     `  - ${p.name} (Three-Point Shot ${p.three} / Mid-Range ${p.mid})`
@@ -49,10 +52,10 @@ function buildPrompt({
     `  - ${g.big} vs ${g.handler}'s ball screens (set by ${g.screener}) → ${g.coverage}. ${g.reason}`
   ))
   const theirAttackLines = fmt((theirAttackTargets||[]).map(p =>
-    `  - ${p.name} [${(p.positions||[]).join('/')}] Per. Def ${p.perim} / Int. Def ${p.interior}`
+    `  - ${p.name} [${(p.positions||[]).join('/')}] Per. Def ${p.perim} / Int. Def ${p.interior}${badgeNote(p)}`
   ))
   const theirHideLines = fmt((theirHideTargets||[]).map(p =>
-    `  - ${p.name} (Perimeter Defense ${p.perim}) — their weak defender, hunt this matchup`
+    `  - ${p.name} (Perimeter Defense ${p.perim})${badgeNote(p)} — their weak defender, hunt this matchup`
   ))
   const myLeftOpenLines = fmt((myPlayersLeftOpen||[]).map(p =>
     `  - ${p.name} (Three-Point Shot ${p.three} / Mid-Range ${p.mid}) — they will sag off him`
@@ -140,7 +143,8 @@ COACHING RULES:
 5. For pick-and-roll coverage: use the exact calls provided — do not invent alternate coverage for those bigs.
 6. For "their game plan against me": call out by name which of my players will get hunted, which of their players I should specifically attack because they'll try to hide him, and which of my players they'll sag off — do not just repeat my own attack targets.
 7. For defensive settings: pick specific values for On-Ball Pressure, Screen Defense, Hedge, Double Team Post, and Drive Help. One line each, name the reason.
-8. Every bullet must name a player and a specific action. No generic advice.
+8. "Badged up" next to a player means his defensive badges make him tougher than his raw rating alone suggests — treat him with more caution than the number implies, and don't call him an easy target without acknowledging the badges.
+9. Every bullet must name a player and a specific action. No generic advice.
 
 Format: 6 sections with short bullet points (•): Offensive Attack Plan, Defensive Assignments, Pick-and-Roll Coverage, Protect Against Their Game Plan, Defensive Settings, and one more if useful. Max 4 bullets per section. Max 1 sentence per bullet. Total under 450 words. Plain text only.`
 }

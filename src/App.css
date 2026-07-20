@@ -643,6 +643,33 @@
 
 .analysis-row:last-child { border-bottom: none; }
 
+/* Wraps an .analysis-row plus badge chips underneath it as a single bordered block. */
+.analysis-row-block {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.analysis-row-block:last-child { border-bottom: none; }
+
+.analysis-row-block .analysis-row {
+  padding: 0;
+  border-bottom: none;
+}
+
+.badged-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 .analysis-name {
   font-size: 13px;
   font-weight: 600;

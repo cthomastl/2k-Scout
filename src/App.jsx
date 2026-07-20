@@ -93,6 +93,34 @@ function pickPositionalLineup(pool, scoreFn) {
   return result
 }
 
+// A raw Perimeter/Interior Defense number doesn't tell the whole story — a player with a mediocre
+// rating but Clamps/Glove/Pick Dodger at Gold+ can still lock up a quick guard, while a "weak"
+// number with no badges is a genuine target. These catalogs + the score/chip helpers below let
+// every defense-rating-driven computation (attack targets, hide targets, best defenders) account
+// for badges instead of the raw number alone.
+const PERIMETER_DEFENSE_BADGES = [
+  'clamps', 'glove', 'interceptor', 'pick dodger', 'chase down artist',
+  'ankle braces', 'off-ball pest', 'challenger', 'high-flying denier', 'intimidator',
+]
+const PAINT_DEFENSE_BADGES = [
+  'rim protector', 'paint patroller', 'post lockdown', 'brick wall',
+  'boxout beast', 'rebound chaser', 'high-flying denier', 'intimidator',
+]
+const BADGE_TIER_WEIGHT = { legendary: 5, 'hall of fame': 4, hof: 4, gold: 3, silver: 2, bronze: 1 }
+function badgeTierWeight(tier) { return BADGE_TIER_WEIGHT[(tier || '').toLowerCase()] ?? 0 }
+
+function matchedDefensiveBadges(player, badgeCatalog) {
+  return dedupeByName(player.badges?.list ?? [])
+    .filter(b => badgeCatalog.includes((b.name || '').toLowerCase()))
+    .sort((a, b) => badgeTierWeight(b.tier) - badgeTierWeight(a.tier))
+}
+
+// Points added to a raw defense rating per matched badge, scaled so a single Gold badge (≈15pts)
+// or HOF (≈20pts) meaningfully moves a player up the list — comparable to a real attribute edge.
+function defensiveBadgeScore(player, badgeCatalog) {
+  return matchedDefensiveBadges(player, badgeCatalog).reduce((sum, b) => sum + badgeTierWeight(b.tier) * 5, 0)
+}
+
 // Computes what `attackRoster` should do against `defendRoster`: attack targets on defendRoster,
 // attackRoster's own weak perimeter defenders to hide, defendRoster's poor shooters to leave open,
 // and attackRoster's perimeter speed edges. Calling this with (opponent, mine) instead of (mine, opponent)
@@ -107,6 +135,13 @@ function computeScoutingReport(attackRoster, defendRoster, n = ROTATION_SIZE) {
       const isB = isBigPlayer(p)
       const perim = p.attributes.perimeterDefense ?? 99
       const interior = p.attributes.interiorDefense ?? 99
+      // A weak raw rating can be misleading if the player is badged up — Clamps/Glove/Pick Dodger
+      // etc. push the *effective* difficulty back up even though the number alone looks soft.
+      const perimBadges = matchedDefensiveBadges(p, PERIMETER_DEFENSE_BADGES)
+      const interiorBadges = matchedDefensiveBadges(p, PAINT_DEFENSE_BADGES)
+      const perimEffective = perim + defensiveBadgeScore(p, PERIMETER_DEFENSE_BADGES)
+      const interiorEffective = interior + defensiveBadgeScore(p, PAINT_DEFENSE_BADGES)
+      const badges = dedupeByName([...perimBadges, ...interiorBadges])
       let attackHint
       if (isB) {
         attackHint = perim <= interior
@@ -115,15 +150,30 @@ function computeScoutingReport(attackRoster, defendRoster, n = ROTATION_SIZE) {
       } else {
         attackHint = 'ISO/drive target — low perimeter defense; blow past them on the wing or in isolation'
       }
-      return { name: p.name, archetype: p.archetype, positions: pos, perim, interior, attackHint }
+      if (badges.length > 0) {
+        attackHint += ` — badged up (${badges.map(b => b.name).join(', ')}), tougher than the raw rating suggests`
+      }
+      return {
+        name: p.name, archetype: p.archetype, positions: pos, perim, interior, attackHint,
+        badges, badged: badges.length > 0,
+        effectiveRating: perimEffective + interiorEffective,
+      }
     })
-    .sort((a, b) => (a.perim + a.interior) - (b.perim + b.interior))
+    .sort((a, b) => a.effectiveRating - b.effectiveRating)
     .slice(0, 3)
 
   const hideTargets = attackers
     .filter(isPerimeterPlayer)
-    .map(p => ({ name: p.name, archetype: p.archetype, perim: p.attributes.perimeterDefense ?? 99 }))
-    .sort((a, b) => a.perim - b.perim)
+    .map(p => {
+      const perim = p.attributes.perimeterDefense ?? 99
+      const badges = matchedDefensiveBadges(p, PERIMETER_DEFENSE_BADGES)
+      return {
+        name: p.name, archetype: p.archetype, perim,
+        badges, badged: badges.length > 0,
+        effectiveRating: perim + defensiveBadgeScore(p, PERIMETER_DEFENSE_BADGES),
+      }
+    })
+    .sort((a, b) => a.effectiveRating - b.effectiveRating)
     .slice(0, 3)
 
   const leaveOpen = targets
@@ -167,23 +217,37 @@ function computeScoutingReport(attackRoster, defendRoster, n = ROTATION_SIZE) {
 function computeBestDefenders(roster) {
   const withAttrs = roster.filter(p => p.attributes)
 
+  // A high Perimeter Defense number alone doesn't guarantee he can stay in front of a quick
+  // guard — a slow-footed defender still gets beat off the dribble. Agility (speed + acceleration)
+  // and defensive badges (Clamps, Glove, Pick Dodger, etc.) both factor into who actually belongs
+  // at the top of this list.
   const lockdownPerimeter = withAttrs
     .filter(isPerimeterPlayer)
-    .map(p => ({
-      name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions,
-      perim: p.attributes.perimeterDefense ?? 0, steal: p.attributes.steal ?? 0,
-      score: (p.attributes.perimeterDefense ?? 0) + (p.attributes.steal ?? 0) * 0.3,
-    }))
+    .map(p => {
+      const agility = ((p.attributes.speed ?? 0) + (p.attributes.acceleration ?? 0)) / 2
+      const badges = matchedDefensiveBadges(p, PERIMETER_DEFENSE_BADGES)
+      const badgeScore = defensiveBadgeScore(p, PERIMETER_DEFENSE_BADGES)
+      return {
+        name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions,
+        perim: p.attributes.perimeterDefense ?? 0, steal: p.attributes.steal ?? 0,
+        speed: p.attributes.speed ?? 0, agility, badges,
+        score: (p.attributes.perimeterDefense ?? 0) + (p.attributes.steal ?? 0) * 0.3 + agility * 0.4 + badgeScore,
+      }
+    })
     .sort((a, b) => b.score - a.score)
     .slice(0, 5)
 
   const paintDefenders = withAttrs
     .filter(isBigPlayer)
-    .map(p => ({
-      name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions,
-      interior: p.attributes.interiorDefense ?? 0, block: p.attributes.block ?? 0,
-      score: (p.attributes.interiorDefense ?? 0) + (p.attributes.block ?? 0) * 0.3,
-    }))
+    .map(p => {
+      const badges = matchedDefensiveBadges(p, PAINT_DEFENSE_BADGES)
+      const badgeScore = defensiveBadgeScore(p, PAINT_DEFENSE_BADGES)
+      return {
+        name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions,
+        interior: p.attributes.interiorDefense ?? 0, block: p.attributes.block ?? 0, badges,
+        score: (p.attributes.interiorDefense ?? 0) + (p.attributes.block ?? 0) * 0.3 + badgeScore,
+      }
+    })
     .sort((a, b) => b.score - a.score)
     .slice(0, 5)
 
@@ -306,6 +370,19 @@ function computeMatchupEdges(myRoster, oppRoster) {
     { label: 'Interior Def',  my: avg(bigs(myRoster).length ? bigs(myRoster) : top5(myRoster),  p => p.attributes.interiorDefense ?? 0), opp: avg(bigs(oppRoster).length ? bigs(oppRoster) : top5(oppRoster), p => p.attributes.interiorDefense ?? 0) },
     { label: '3PT Shooting',  my: avg(perim(myRoster),  p => p.attributes.threePointShot ?? 0),      opp: avg(perim(oppRoster),  p => p.attributes.threePointShot ?? 0) },
   ]
+}
+
+function DefBadgeChips({ badges }) {
+  if (!badges || badges.length === 0) return null
+  return (
+    <div className="badge-player-chips" style={{ marginTop: 4 }}>
+      {badges.map((b, j) => (
+        <span key={j} className="badge-chip small" style={{ borderColor: getBadgeTierColor(b.tier), color: getBadgeTierColor(b.tier) }}>
+          {b.name} · {getBadgeTierLabel(b.tier)}
+        </span>
+      ))}
+    </div>
+  )
 }
 
 function Spinner({ small, label, center }) {
@@ -742,30 +819,42 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
         <div className="analysis-grid">
           <div className="analysis-card">
             <div className="analysis-card-title">Attack Offensively</div>
-            <p className="analysis-hint">Weakest defenders on {opponentTeam}</p>
+            <p className="analysis-hint">Weakest defenders on {opponentTeam} — "Badged Up" means the raw rating undersells them</p>
             {attackTargets.length === 0 && <p className="no-data">Insufficient data</p>}
             {attackTargets.map((p, i) => (
-              <div key={i} className="analysis-row">
-                <span className="analysis-name">{p.name}</span>
-                <span className="analysis-stats">
-                  <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
-                  {' / '}
-                  <span style={{ color: getRatingColor(p.interior) }}>Int. Def {p.interior}</span>
-                </span>
+              <div key={i} className="analysis-row-block">
+                <div className="analysis-row">
+                  <span className="analysis-name">
+                    {p.name}
+                    {p.badged && <span className="badged-tag">Badged Up</span>}
+                  </span>
+                  <span className="analysis-stats">
+                    <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
+                    {' / '}
+                    <span style={{ color: getRatingColor(p.interior) }}>Int. Def {p.interior}</span>
+                  </span>
+                </div>
+                <DefBadgeChips badges={p.badges} />
               </div>
             ))}
           </div>
 
           <div className="analysis-card">
             <div className="analysis-card-title">Hide Defensively</div>
-            <p className="analysis-hint">Weakest perimeter defenders on {myTeam}</p>
+            <p className="analysis-hint">Weakest perimeter defenders on {myTeam} — "Badged Up" means he's better than the raw rating suggests</p>
             {hideTargets.length === 0 && <p className="no-data">Insufficient data</p>}
             {hideTargets.map((p, i) => (
-              <div key={i} className="analysis-row">
-                <span className="analysis-name">{p.name}</span>
-                <span className="analysis-stats">
-                  <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
-                </span>
+              <div key={i} className="analysis-row-block">
+                <div className="analysis-row">
+                  <span className="analysis-name">
+                    {p.name}
+                    {p.badged && <span className="badged-tag">Badged Up</span>}
+                  </span>
+                  <span className="analysis-stats">
+                    <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
+                  </span>
+                </div>
+                <DefBadgeChips badges={p.badges} />
               </div>
             ))}
           </div>
@@ -828,32 +917,40 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
         <div className="analysis-grid">
           <div className="analysis-card">
             <div className="analysis-card-title">Best Lockdown Perimeter Defenders</div>
-            <p className="analysis-hint">Full {myTeam} roster — top options to guard elite wings/guards</p>
+            <p className="analysis-hint">Full {myTeam} roster, ranked by Perimeter Defense + agility + defensive badges — a high rating with slow feet still gets beat off the dribble</p>
             {bestDefenders.lockdownPerimeter.length === 0 && <p className="no-data">Insufficient data</p>}
             {bestDefenders.lockdownPerimeter.map((p, i) => (
-              <div key={i} className="analysis-row">
-                <span className="analysis-name">{p.name}</span>
-                <span className="analysis-stats">
-                  <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
-                  {' / '}
-                  <span style={{ color: getRatingColor(p.steal) }}>Steal {p.steal}</span>
-                </span>
+              <div key={i} className="analysis-row-block">
+                <div className="analysis-row">
+                  <span className="analysis-name">{p.name}</span>
+                  <span className="analysis-stats">
+                    <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
+                    {' / '}
+                    <span style={{ color: getRatingColor(p.speed) }}>Speed {p.speed}</span>
+                    {' / '}
+                    <span style={{ color: getRatingColor(p.steal) }}>Steal {p.steal}</span>
+                  </span>
+                </div>
+                <DefBadgeChips badges={p.badges} />
               </div>
             ))}
           </div>
 
           <div className="analysis-card">
             <div className="analysis-card-title">Best Paint Defenders</div>
-            <p className="analysis-hint">Full {myTeam} roster — top rim-protection options</p>
+            <p className="analysis-hint">Full {myTeam} roster, ranked by Interior Defense + Block + defensive badges</p>
             {bestDefenders.paintDefenders.length === 0 && <p className="no-data">Insufficient data</p>}
             {bestDefenders.paintDefenders.map((p, i) => (
-              <div key={i} className="analysis-row">
-                <span className="analysis-name">{p.name}</span>
-                <span className="analysis-stats">
-                  <span style={{ color: getRatingColor(p.interior) }}>Int. Def {p.interior}</span>
-                  {' / '}
-                  <span style={{ color: getRatingColor(p.block) }}>Block {p.block}</span>
-                </span>
+              <div key={i} className="analysis-row-block">
+                <div className="analysis-row">
+                  <span className="analysis-name">{p.name}</span>
+                  <span className="analysis-stats">
+                    <span style={{ color: getRatingColor(p.interior) }}>Int. Def {p.interior}</span>
+                    {' / '}
+                    <span style={{ color: getRatingColor(p.block) }}>Block {p.block}</span>
+                  </span>
+                </div>
+                <DefBadgeChips badges={p.badges} />
               </div>
             ))}
           </div>
@@ -935,30 +1032,42 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
         <div className="analysis-grid">
           <div className="analysis-card">
             <div className="analysis-card-title">What They'll Attack</div>
-            <p className="analysis-hint">Weak links on {myTeam} they'll target</p>
+            <p className="analysis-hint">Weak links on {myTeam} they'll target — "Badged Up" means it's not as easy as the rating looks</p>
             {theirReport.attackTargets.length === 0 && <p className="no-data">Insufficient data</p>}
             {theirReport.attackTargets.map((p, i) => (
-              <div key={i} className="analysis-row">
-                <span className="analysis-name">{p.name}</span>
-                <span className="analysis-stats">
-                  <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
-                  {' / '}
-                  <span style={{ color: getRatingColor(p.interior) }}>Int. Def {p.interior}</span>
-                </span>
+              <div key={i} className="analysis-row-block">
+                <div className="analysis-row">
+                  <span className="analysis-name">
+                    {p.name}
+                    {p.badged && <span className="badged-tag">Badged Up</span>}
+                  </span>
+                  <span className="analysis-stats">
+                    <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
+                    {' / '}
+                    <span style={{ color: getRatingColor(p.interior) }}>Int. Def {p.interior}</span>
+                  </span>
+                </div>
+                <DefBadgeChips badges={p.badges} />
               </div>
             ))}
           </div>
 
           <div className="analysis-card">
             <div className="analysis-card-title">Defenders They'll Hide</div>
-            <p className="analysis-hint">{opponentTeam}'s weak perimeter defenders — hunt these matchups</p>
+            <p className="analysis-hint">{opponentTeam}'s weak perimeter defenders — hunt these matchups (watch for "Badged Up")</p>
             {theirReport.hideTargets.length === 0 && <p className="no-data">Insufficient data</p>}
             {theirReport.hideTargets.map((p, i) => (
-              <div key={i} className="analysis-row">
-                <span className="analysis-name">{p.name}</span>
-                <span className="analysis-stats">
-                  <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
-                </span>
+              <div key={i} className="analysis-row-block">
+                <div className="analysis-row">
+                  <span className="analysis-name">
+                    {p.name}
+                    {p.badged && <span className="badged-tag">Badged Up</span>}
+                  </span>
+                  <span className="analysis-stats">
+                    <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
+                  </span>
+                </div>
+                <DefBadgeChips badges={p.badges} />
               </div>
             ))}
           </div>
