@@ -6,19 +6,35 @@ microservices on Kubernetes, behind a login, with a light/dark dashboard UI.
 
 ## What it does
 
-Sign in (or create an account), pick any two teams, and 2K Scout computes — for the
-**starting five only**:
+Sign in (or create an account), pick any two teams, and 2K Scout computes — across each team's
+**rotation (top 8 by overall)**, with on-court assignments still scoped to the starting five:
 
-- **Attack Offensively** — opponent's weakest starting defenders to ISO
+- **Attack Offensively** — opponent's weakest defenders to ISO, with defensive badges (Clamps,
+  Glove, Pick Dodger, etc.) factored in so a "weak" rating that's actually badged-up doesn't
+  mislead you
 - **Hide Defensively** — your weakest perimeter defenders paired with their worst shooters
-- **Leave Open** — opponent perimeter starters safe to sag off (3PT < 80)
+- **Leave Open** — opponent perimeter players safe to sag off (3PT < 80)
 - **Speed Advantage** — your players with a real speed edge over their positional matchup
-- **Best Matchups** — your best available defender for each of their top 5 (position-aware,
+- **Best Matchups** — your best starting-five defender for each of their top 5 (position-aware,
   stretch bigs handled correctly, no defender assigned twice)
+- **Best Defenders** — your best lockdown perimeter defenders and best paint defenders across the
+  full roster (ranked by rating + agility + badges, not rating alone), including bench specialists
+- **Pick-and-Roll Coverage** — Drop / Hedge / Switch recommendations for your bigs against the
+  opponent's top ball-handlers and screeners, reasoned from rim protection, switchability
+  (Perimeter Defense), and pull-up/pop/pass threat
+- **Beat Their Big** — identifies the opponent's rim-camping shot-blocking anchor and gives
+  personnel-specific tactics from your own roster to exploit him (drag him out with a stretch
+  big, attack in transition if he's slow, finish away from his contest, draw fouls, skip pass to
+  the weak side, crash the offensive glass)
+- **Their Game Plan** — the mirror image of your scouting report: who they'll attack on your
+  roster, which of their weak defenders to hunt, who they'll leave open on your team, and their
+  speed advantages over you
 - **Clutch Players** — highest Shot IQ + Offensive Consistency
-- **Lineups** — Closing, Pace & Space, Sharpshooters (positionally balanced), Lockdown, Twin Towers
+- **Lineups** — Best Overall, Best Defensive, Best 3PT (all positionally balanced)
 - **Team Rankings** — every All-Time team ranked across Speed, Perimeter D, Interior D, 3PT, Rebounding
-- **AI Game Plan** — full offensive/defensive scouting report from Claude, reasoning strictly from 2K stats
+- **AI Game Plan** — full offensive/defensive scouting report from Claude, incorporating
+  pick-and-roll coverage, the Beat Their Big tactics, situational lineups, substitution tips, and
+  the opponent's likely game plan against you, reasoning strictly from 2K stats and badges
 - **History** — every generated game plan is saved to your account and revisitable later,
   instead of being regenerated (and re-billed) from scratch each time
 
