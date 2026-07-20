@@ -46,7 +46,7 @@ function buildPrompt({
   }))
 
   const pnrLines = fmt((pnrGuidance||[]).map(g =>
-    `  - ${g.big} vs ${g.handler}'s ball screens → ${g.coverage}. ${g.reason}`
+    `  - ${g.big} vs ${g.handler}'s ball screens (set by ${g.screener}) → ${g.coverage}. ${g.reason}`
   ))
   const theirAttackLines = fmt((theirAttackTargets||[]).map(p =>
     `  - ${p.name} [${(p.positions||[]).join('/')}] Per. Def ${p.perim} / Int. Def ${p.interior}`

@@ -190,10 +190,14 @@ function computeBestDefenders(roster) {
   return { lockdownPerimeter, paintDefenders }
 }
 
-// Recommends ball-screen coverage for myRoster's top bigs against oppRoster's most dangerous
-// ball-handler, reasoning from rim protection, mobility, and the handler's pull-up/pass threat.
+// Recommends ball-screen coverage for up to two (my big, their ball-handler, their screener)
+// combos — not just a single handler vs. a single big. Reasons from the screener's pop/lob/pass
+// threat as well as the handler's pull-up threat, and gates Switch on the big's own Perimeter
+// Defense (not raw speed) since that's the stat that actually determines whether he survives
+// being switched onto a guard.
 function computePnRGuidance(myRoster, oppRoster) {
   const withAttrs = r => r.filter(p => p.attributes)
+
   const myBigs = withAttrs(myRoster)
     .filter(isBigPlayer)
     .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
@@ -206,37 +210,80 @@ function computePnRGuidance(myRoster, oppRoster) {
       handleScore: (p.attributes.ballHandle ?? 0) * 0.4 + (p.attributes.speed ?? 0) * 0.3 + (p.attributes.acceleration ?? 0) * 0.3,
     }))
     .sort((a, b) => b.handleScore - a.handleScore)
+    .slice(0, 2)
 
-  if (!myBigs.length || !ballHandlers.length) return []
+  // Screeners: the opponent's top bigs, paired 1:1 with their top ball-handlers as the two most
+  // likely starting screen actions. We don't have real play-calling data, so this is a proxy —
+  // but it's a real improvement over ignoring the screener entirely.
+  const screeners = withAttrs(oppRoster)
+    .filter(isBigPlayer)
+    .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
+    .slice(0, 2)
 
-  const primaryHandler = ballHandlers[0]
-  const pullUpThreat = Math.max(primaryHandler.attributes.threePointShot ?? 0, primaryHandler.attributes.midRangeShot ?? 0)
-  const passNote = (primaryHandler.attributes.passAccuracy ?? 0) >= 85
-    ? ` Watch the short roll — ${primaryHandler.name} passes at a ${primaryHandler.attributes.passAccuracy} rating.`
-    : ''
+  if (!myBigs.length || !ballHandlers.length || !screeners.length) return []
 
-  return myBigs.map(big => {
+  const pairCount = Math.min(myBigs.length, ballHandlers.length)
+
+  return Array.from({ length: pairCount }, (_, i) => {
+    const big = myBigs[i]
+    const handler = ballHandlers[i] ?? ballHandlers[0]
+    const screener = screeners[i] ?? screeners[0]
+
+    const pullUpThreat = Math.max(handler.attributes.threePointShot ?? 0, handler.attributes.midRangeShot ?? 0)
     const rimProtection = ((big.attributes.interiorDefense ?? 0) + (big.attributes.block ?? 0)) / 2
-    const mobility = ((big.attributes.speed ?? 0) + (big.attributes.acceleration ?? 0)) / 2
+    // Switchability is gated on the big's own Perimeter Defense — the stat that measures whether
+    // he can actually contain a guard in space — not on raw speed/acceleration.
+    const switchability = big.attributes.perimeterDefense ?? 0
+    const hedgeRecovery = ((big.attributes.speed ?? 0) + (big.attributes.acceleration ?? 0)) / 2
+    const screenerPopThreat = screener.attributes.threePointShot ?? 0
+    const screenerLobThreat = ((screener.attributes.vertical ?? 0) + (screener.attributes.closeShot ?? 0)) / 2
+    const screenerPassAccuracy = screener.attributes.passAccuracy ?? 0
 
     let coverage, reason
-    if (pullUpThreat >= 85) {
-      coverage = mobility >= 70 ? 'Hard Hedge' : 'Switch'
-      reason = mobility >= 70
-        ? `${primaryHandler.name} is a lethal pull-up shooter (${pullUpThreat} rated) — hedge hard with ${big.name} to force the ball out of his hands before he can rise into a jumper.`
-        : `${primaryHandler.name} is a lethal pull-up shooter (${pullUpThreat} rated) and ${big.name} isn't mobile enough to hedge and recover — switch to take away the jumper entirely.`
+    if (screenerPopThreat >= 78) {
+      // A stretch screener makes Drop unsafe regardless of the handler's own shooting — dropping
+      // leaves the screener wide open on the pop.
+      if (switchability >= 75) {
+        coverage = 'Switch'
+        reason = `${screener.name} can pop for three (${screenerPopThreat} rated) — Drop leaves him wide open, so switch the screen with ${big.name} and live with the resulting matchup.`
+      } else if (hedgeRecovery >= 70) {
+        coverage = 'Hard Hedge'
+        reason = `${screener.name} can pop for three (${screenerPopThreat} rated), so Drop isn't safe — hedge hard with ${big.name} on ${handler.name} and closeout to the screener as he pops.`
+      } else {
+        coverage = 'Go Under'
+        reason = `${screener.name} can pop for three and ${big.name} can't switch or hedge and recover in time — go under and live with a contested pull-up rather than risk a blown closeout on the screener.`
+      }
+    } else if (pullUpThreat >= 85) {
+      if (switchability >= 75) {
+        coverage = 'Switch'
+        reason = `${handler.name} is a lethal pull-up shooter (${pullUpThreat} rated) — switch the screen with ${big.name} to take away the jumper entirely.`
+      } else if (hedgeRecovery >= 70) {
+        coverage = 'Hard Hedge'
+        reason = `${handler.name} is a lethal pull-up shooter (${pullUpThreat} rated) — hedge hard with ${big.name} to force the ball out of his hands before he can rise into it.`
+      } else {
+        coverage = 'Go Under'
+        reason = `${handler.name} is a lethal pull-up shooter and ${big.name} can't switch (weak Perimeter Defense) or hedge effectively — go under and funnel him toward help instead of risking a mismatch.`
+      }
     } else if (rimProtection >= 80) {
       coverage = 'Drop'
-      reason = `${big.name} protects the rim (Int. Def/Block avg ${Math.round(rimProtection)}) and ${primaryHandler.name} isn't a real shooting threat (${pullUpThreat} rated) — drop and dare the pull-up.`
-    } else if (mobility >= 75) {
+      reason = `${big.name} protects the rim (Int. Def/Block avg ${Math.round(rimProtection)}) and ${handler.name} isn't a real shooting threat (${pullUpThreat} rated) — drop and dare the pull-up.`
+      if (screenerLobThreat >= 85) {
+        reason += ` Stay alert for the lob — ${screener.name} finishes above the rim.`
+      }
+    } else if (hedgeRecovery >= 75) {
       coverage = 'Soft Hedge'
-      reason = `${big.name} has the mobility (avg ${Math.round(mobility)}) to hedge and recover without opening an easy roll.`
+      reason = `${big.name} has the mobility (avg ${Math.round(hedgeRecovery)}) to hedge and recover without opening an easy roll.`
     } else {
       coverage = 'Go Under'
       reason = `${big.name} lacks rim protection and mobility — keep the guard going under the screen rather than put ${big.name} in space.`
     }
 
-    return { big: big.name, handler: primaryHandler.name, coverage, reason: reason + passNote }
+    // Short-roll passing is the SCREENER's read after diving to the elbow, not the handler's kick-out passing.
+    if (screenerPassAccuracy >= 85 && coverage !== 'Switch') {
+      reason += ` Watch the short roll — ${screener.name} passes well off the catch (${screenerPassAccuracy} rating).`
+    }
+
+    return { big: big.name, handler: handler.name, screener: screener.name, coverage, reason }
   })
 }
 
@@ -867,7 +914,7 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
             <div className="analysis-card-title">Pick-and-Roll Coverage</div>
             <p className="analysis-hint">
               {pnrGuidance.length > 0
-                ? `Recommended coverage for your bigs vs ${opponentTeam}'s top ball-handler, ${pnrGuidance[0].handler}`
+                ? `Recommended coverage for your bigs against ${opponentTeam}'s top pick-and-roll threats`
                 : 'Insufficient data for pick-and-roll coverage'}
             </p>
             {pnrGuidance.map((g, i) => (
@@ -876,6 +923,7 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
                   <span className="pnr-big">{g.big}</span>
                   <span className="pnr-coverage-tag">{g.coverage}</span>
                 </div>
+                <p className="pnr-matchup">vs {g.handler}, screened by {g.screener}</p>
                 <p className="pnr-reason">{g.reason}</p>
               </div>
             ))}

@@ -745,6 +745,12 @@
   flex-shrink: 0;
 }
 
+.pnr-matchup {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
 .pnr-reason {
   font-size: 12px;
   color: var(--text-faint);
