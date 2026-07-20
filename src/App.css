@@ -39,7 +39,7 @@
   font-weight: 700;
   color: var(--text);
   text-transform: uppercase;
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
   letter-spacing: 0.5px;
   margin-bottom: 10px;
 }
@@ -198,7 +198,7 @@
 }
 
 .stat-group {
-  background: var(--surface-2);
+  background: var(--surface);
   border-radius: 8px;
   padding: 10px;
   border: 1px solid var(--border);
@@ -208,7 +208,7 @@
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
   letter-spacing: 0.8px;
   color: var(--text-muted);
   margin-bottom: 8px;
@@ -238,7 +238,7 @@
 
 /* ── Badges ── */
 .badges-section {
-  background: var(--surface-2);
+  background: var(--surface);
   border-radius: 8px;
   padding: 10px;
   border: 1px solid var(--border);
@@ -248,7 +248,7 @@
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
   letter-spacing: 0.8px;
   color: var(--text-muted);
   margin-bottom: 8px;
@@ -267,7 +267,7 @@
 
 /* ── Matchup Edges Card ── */
 .matchup-edges-card {
-  background: var(--surface-2);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px 18px;
@@ -299,7 +299,7 @@
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
   letter-spacing: 0.8px;
   color: var(--text-faint);
   flex-shrink: 0;
@@ -329,7 +329,7 @@
   font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
   letter-spacing: 0.5px;
   text-align: center;
   flex: 1;
@@ -357,7 +357,7 @@
 }
 
 .lineup-card {
-  background: var(--surface-2);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px;
@@ -367,7 +367,7 @@
   font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
   letter-spacing: 0.6px;
   color: var(--text);
   margin-bottom: 4px;
@@ -435,7 +435,7 @@
   font-weight: 800;
   color: var(--text);
   text-transform: uppercase;
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
   letter-spacing: 0.5px;
   margin-bottom: 4px;
 }
@@ -501,7 +501,7 @@
 }
 
 .analysis-card {
-  background: var(--surface-2);
+  background: var(--surface);
   border-radius: 10px;
   border: 1px solid var(--border);
   padding: 14px;
@@ -511,7 +511,7 @@
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
   letter-spacing: 0.8px;
   color: var(--text-faint);
   margin-bottom: 6px;
@@ -725,7 +725,7 @@
   font-weight: 700;
   color: var(--text-faint);
   text-transform: uppercase;
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
   letter-spacing: 0.08em;
   border-bottom: 1px solid var(--border);
   z-index: 1;

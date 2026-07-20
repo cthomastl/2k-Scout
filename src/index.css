@@ -7,25 +7,25 @@
 /* ── shadcn/ui design tokens (warm cream light theme, per the nba2kapi reference) ── */
 :root {
   --radius: 14px;
-  --background: #f6f3ea;
-  --foreground: #17160f;
-  --card: #ffffff;
-  --card-foreground: #17160f;
-  --popover: #ffffff;
-  --popover-foreground: #17160f;
-  --primary: #15140d;
-  --primary-foreground: #faf8f2;
-  --secondary: #efece0;
-  --secondary-foreground: #2a2820;
-  --muted: #eae6d8;
-  --muted-foreground: #77715f;
-  --accent: #efece0;
-  --accent-foreground: #2a2820;
-  --destructive: #dc2626;
-  --destructive-foreground: #faf8f2;
-  --border: #e5e0d0;
-  --input: #d9d2bd;
-  --ring: #a89f85;
+  --background: #f1efe8;
+  --foreground: #1a1918;
+  --card: #faf9f5;
+  --card-foreground: #1a1918;
+  --popover: #faf9f5;
+  --popover-foreground: #1a1918;
+  --primary: #1a1918;
+  --primary-foreground: #faf9f5;
+  --secondary: #f4f1ea;
+  --secondary-foreground: #57534a;
+  --muted: #efece4;
+  --muted-foreground: #8a8577;
+  --accent: #efece4;
+  --accent-foreground: #1a1918;
+  --destructive: #b3403d;
+  --destructive-foreground: #faf9f5;
+  --border: #e5e2da;
+  --input: #d9d4c7;
+  --ring: #b5b0a1;
 }
 
 [data-theme='dark'] {
@@ -51,7 +51,8 @@
 }
 
 @theme inline {
-  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Consolas, monospace;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

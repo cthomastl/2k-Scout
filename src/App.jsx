@@ -47,47 +47,37 @@ const IconBolt = p => <Zap size={18} strokeWidth={1.7} {...p} />
 const IconArrowRight = p => <ArrowRight size={18} strokeWidth={1.7} {...p} />
 const IconHistory = p => <HistoryIcon size={18} strokeWidth={1.7} {...p} />
 
+// Monochrome emphasis ramp (per the reference design): elite ratings read near-black,
+// weak ones fade out — information without the traffic-light color noise.
 function getRatingColor(val) {
   const n = parseInt(val, 10)
-  if (isNaN(n)) return '#9ca3af'
-  if (n >= 90) return '#22c55e'
-  if (n >= 75) return '#eab308'
-  return '#ef4444'
+  if (isNaN(n)) return '#b5b0a1'
+  if (n >= 90) return '#1a1918'
+  if (n >= 75) return '#57534a'
+  return '#8a8577'
 }
 
 // 2K card-tier chip colors (Galaxy Opal → Pink Diamond → Diamond → Amethyst → base),
 // matching the rating pills on the nba2kapi reference design.
-function ratingChipBackground(val) {
+function ratingChipStyle(val) {
   const n = parseInt(val, 10)
-  if (isNaN(n)) return '#a8a29e'
-  if (n >= 95) return 'linear-gradient(135deg, #d946ef, #8b5cf6)'
-  if (n >= 90) return '#a855f7'
-  if (n >= 85) return '#3b82f6'
-  if (n >= 80) return '#f59e0b'
-  return '#78716c'
+  if (isNaN(n)) return { background: '#e5e2da', color: '#57534a' }
+  if (n >= 95) return { background: '#1a1918', color: '#faf9f5' }
+  if (n >= 90) return { background: '#b79ce0', color: '#1a1918' }
+  if (n >= 85) return { background: '#d9bd7c', color: '#1a1918' }
+  return { background: '#e5e2da', color: '#57534a' }
 }
 
 function RatingChip({ value, className }) {
   if (value == null || value === '—') return null
   return (
     <span
-      className={cn('inline-flex min-w-8 items-center justify-center rounded-md px-1.5 py-0.5 font-mono text-xs font-bold text-white', className)}
-      style={{ background: ratingChipBackground(value) }}
+      className={cn('inline-flex min-w-8 items-center justify-center rounded-md px-1.5 py-0.5 font-mono text-xs font-bold', className)}
+      style={ratingChipStyle(value)}
     >
       {value}
     </span>
   )
-}
-
-function getBadgeTierColor(tier) {
-  if (!tier) return '#9ca3af'
-  const t = tier.toLowerCase()
-  if (t === 'legendary') return '#a855f7'
-  if (t === 'hall of fame' || t === 'hof') return '#f59e0b'
-  if (t === 'gold') return '#eab308'
-  if (t === 'silver') return '#94a3b8'
-  if (t === 'bronze') return '#b45309'
-  return '#9ca3af'
 }
 
 function getBadgeTierLabel(tier) {
@@ -503,9 +493,8 @@ function computeMatchupEdges(myRoster, oppRoster) {
 }
 
 function TierBadge({ badge, className }) {
-  const color = getBadgeTierColor(badge.tier)
   return (
-    <Badge variant="outline" className={className} style={{ borderColor: color, color }}>
+    <Badge variant="outline" className={cn('border-border bg-card text-secondary-foreground', className)}>
       {badge.name}{badge.tier ? ` · ${getBadgeTierLabel(badge.tier)}` : ''}
     </Badge>
   )
@@ -964,8 +953,8 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam, token
         {edges.map((e, i) => {
           const myWins = e.my > e.opp
           const tie = e.my === e.opp
-          const myColor  = tie ? '#64748b' : myWins ? '#22c55e' : '#ef4444'
-          const oppColor = tie ? '#64748b' : !myWins ? '#22c55e' : '#ef4444'
+          const myColor  = tie ? '#8a8577' : myWins ? '#1a1918' : '#b5b0a1'
+          const oppColor = tie ? '#8a8577' : !myWins ? '#1a1918' : '#b5b0a1'
           return (
             <div key={i} className="edge-row">
               <span className="edge-val" style={{ color: myColor }}>{e.my}</span>
