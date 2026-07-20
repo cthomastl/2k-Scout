@@ -18,6 +18,7 @@ function buildPrompt({
   myTeam, opponentTeam, attackTargets, hideTargets, leaveOpen, speedAdvantage, bestMatchups,
   myKeyPlayers, oppKeyPlayers, opponentStrategy,
   pnrGuidance, theirAttackTargets, theirHideTargets, myPlayersLeftOpen, theirSpeedAdvantage, topDefenders,
+  lineups,
 }) {
   const fmt = lines => lines.length ? lines.join('\n') : '  - No data'
   // hideTargets/attackTargets/theirAttackTargets/theirHideTargets carry `badges` as raw
@@ -41,12 +42,18 @@ function buildPrompt({
   ))
   const myRosterLines = fmt((myKeyPlayers||[]).map(p => {
     const badgeStr = p.badges?.length ? ` | Badges: ${p.badges.join(', ')}` : ''
-    return `  - ${p.name} [OVR ${p.overall}, ${(p.positions||[]).join('/')}${p.archetype ? ', ' + p.archetype : ''}]${badgeStr}`
+    const benchStr = p.bench ? ' (bench)' : ''
+    return `  - ${p.name} [OVR ${p.overall}, ${(p.positions||[]).join('/')}${p.archetype ? ', ' + p.archetype : ''}]${benchStr}${badgeStr}`
   }))
   const oppRosterLines = fmt((oppKeyPlayers||[]).map(p => {
     const badgeStr = p.badges?.length ? ` | Badges: ${p.badges.join(', ')}` : ''
-    return `  - ${p.name} [OVR ${p.overall}, ${(p.positions||[]).join('/')}${p.archetype ? ', ' + p.archetype : ''}]${badgeStr}`
+    const benchStr = p.bench ? ' (bench)' : ''
+    return `  - ${p.name} [OVR ${p.overall}, ${(p.positions||[]).join('/')}${p.archetype ? ', ' + p.archetype : ''}]${benchStr}${badgeStr}`
   }))
+
+  const lineupLines = fmt((lineups||[]).map(l =>
+    `  - ${l.name} (${l.desc}): ${(l.players||[]).join(', ')}`
+  ))
 
   const pnrLines = fmt((pnrGuidance||[]).map(g =>
     `  - ${g.big} vs ${g.handler}'s ball screens (set by ${g.screener}) → ${g.coverage}. ${g.reason}`
@@ -86,6 +93,9 @@ ${oppRosterLines}
 
 My best available defenders (may include bench pieces — call them in when relevant):
 ${bestDefenderLines}
+
+LINEUP OPTIONS (already computed — reference these by name, do not invent other lineups):
+${lineupLines}
 
 --- 2K STAT DEFINITIONS (use these to reason correctly) ---
 Perimeter Defense: guards the arc and mid-range. Low PD on a BIG means they cannot guard on the perimeter — exploit by pulling them AWAY from the paint with a stretch player, NOT by driving into them. Low PD on a GUARD/WING means drive/ISO directly at them.
@@ -144,9 +154,11 @@ COACHING RULES:
 6. For "their game plan against me": call out by name which of my players will get hunted, which of their players I should specifically attack because they'll try to hide him, and which of my players they'll sag off — do not just repeat my own attack targets.
 7. For defensive settings: pick specific values for On-Ball Pressure, Screen Defense, Hedge, Double Team Post, and Drive Help. One line each, name the reason.
 8. "Badged up" next to a player means his defensive badges make him tougher than his raw rating alone suggests — treat him with more caution than the number implies, and don't call him an easy target without acknowledging the badges.
-9. Every bullet must name a player and a specific action. No generic advice.
+9. For situational lineups: use the exact 3 lineups provided (Best Overall, Best Defensive, Best 3PT) — do not invent a different lineup. Tie each one to a specific in-game situation (protecting a late lead, need a defensive stop, trailing and need to erase a deficit fast, foul trouble on a starter, opponent going small/big).
+10. For substitution tips: name at least 2 specific bench players from MY ROTATION (marked "(bench)") and the exact situation to bring each one in — fatigue on a starter, foul trouble, a specific matchup from "My best available defenders", or a change in the opponent's approach. Do not suggest a substitution for a player not listed in my rotation.
+11. Every bullet must name a player and a specific action. No generic advice.
 
-Format: 6 sections with short bullet points (•): Offensive Attack Plan, Defensive Assignments, Pick-and-Roll Coverage, Protect Against Their Game Plan, Defensive Settings, and one more if useful. Max 4 bullets per section. Max 1 sentence per bullet. Total under 450 words. Plain text only.`
+Format: 7 sections with short bullet points (•): Offensive Attack Plan, Defensive Assignments, Pick-and-Roll Coverage, Protect Against Their Game Plan, Defensive Settings, Situational Lineups, Substitution Tips. Max 4 bullets per section (Situational Lineups and Substitution Tips can use 3). Max 1 sentence per bullet. Total under 600 words. Plain text only.`
 }
 
 app.post('/api/gameplan', async (req, res) => {
@@ -161,6 +173,7 @@ app.post('/api/gameplan', async (req, res) => {
     pnrGuidance = [],
     theirAttackTargets = [], theirHideTargets = [], myPlayersLeftOpen = [], theirSpeedAdvantage = [],
     topDefenders = {},
+    lineups = [],
   } = body
 
   if (!myTeam || !opponentTeam) {
@@ -172,11 +185,12 @@ app.post('/api/gameplan', async (req, res) => {
       myTeam, opponentTeam, attackTargets, hideTargets, leaveOpen, speedAdvantage, bestMatchups,
       myKeyPlayers, oppKeyPlayers, opponentStrategy,
       pnrGuidance, theirAttackTargets, theirHideTargets, myPlayersLeftOpen, theirSpeedAdvantage, topDefenders,
+      lineups,
     })
 
     const message = await client.messages.create({
       model: 'claude-opus-4-8',
-      max_tokens: 2000,
+      max_tokens: 2800,
       messages: [{ role: 'user', content: prompt }],
     })
 

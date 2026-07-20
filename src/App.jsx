@@ -148,7 +148,11 @@ function computeScoutingReport(attackRoster, defendRoster, n = ROTATION_SIZE) {
           ? 'stretch big — low PD means cannot guard on perimeter; use a shooter to pull them away from the paint'
           : 'paint target — low interior defense; post up or attack the basket against them'
       } else {
-        attackHint = 'ISO/drive target — low perimeter defense; blow past them on the wing or in isolation'
+        // A guard/wing can be a target for either reason — don't always blame perimeter defense
+        // when his real weakness is interior defense (post him up / attack the rim instead).
+        attackHint = perim <= interior
+          ? 'ISO/drive target — low perimeter defense; blow past them on the wing or in isolation'
+          : 'small-ball post target — solid on the perimeter but weak interior defense; back him down or attack the rim rather than trying to blow by him'
       }
       if (badges.length > 0) {
         attackHint += ` — badged up (${badges.map(b => b.name).join(', ')}), tougher than the raw rating suggests`
@@ -622,10 +626,19 @@ function dedupeByName(list) {
   })
 }
 
+// A short preview shown when the game plan is minimized — first sentence-ish chunk, not a mid-word cut.
+function summarizePlan(text, maxLen = 160) {
+  if (!text) return ''
+  const trimmed = text.trim()
+  if (trimmed.length <= maxLen) return trimmed
+  return trimmed.slice(0, maxLen).replace(/\s+\S*$/, '') + '…'
+}
+
 function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
   const [gamePlan, setGamePlan] = useState(null)
   const [planLoading, setPlanLoading] = useState(false)
   const [planError, setPlanError] = useState(null)
+  const [planMinimized, setPlanMinimized] = useState(false)
   const [activeTab, setActiveTab] = useState('scouting')
   const [opponentStrategy, setOpponentStrategy] = useState('')
 
@@ -705,8 +718,8 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
         .slice(0, 5)
         .map(b => `${b.name} (${getBadgeTierLabel(b.tier)})`)
 
-      const myKeyPlayers = myRotation.map(p => ({ name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions, badges: topBadges(p) }))
-      const oppKeyPlayers = oppRotation.map(p => ({ name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions, badges: topBadges(p) }))
+      const myKeyPlayers = myRotation.map((p, i) => ({ name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions, badges: topBadges(p), bench: i >= 5 }))
+      const oppKeyPlayers = oppRotation.map((p, i) => ({ name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions, badges: topBadges(p), bench: i >= 5 }))
 
       const speedAdvantagePayload = speedAdvantage.map(m => ({
         myPlayer: m.attackerPlayer, mySpeed: m.attackerSpeed, oppPlayer: m.targetPlayer, oppSpeed: m.targetSpeed, diff: m.diff,
@@ -719,6 +732,8 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
         lockdownPerimeter: bestDefenders.lockdownPerimeter.slice(0, 2).map(p => ({ name: p.name, perim: p.perim })),
         paintDefenders: bestDefenders.paintDefenders.slice(0, 2).map(p => ({ name: p.name, interior: p.interior })),
       }
+
+      const lineupsPayload = lineups.map(l => ({ name: l.name, desc: l.desc, players: l.players.map(p => p.name) }))
 
       const res = await fetch(GAMEPLAN_URL, {
         method: 'POST',
@@ -734,6 +749,7 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
           myPlayersLeftOpen: theirReport.leaveOpen,
           theirSpeedAdvantage,
           topDefenders,
+          lineups: lineupsPayload,
           opponentStrategy: opponentStrategy.trim(),
         }),
       })
@@ -741,6 +757,7 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setGamePlan(data.gamePlan)
+      setPlanMinimized(false)
     } catch (e) {
       setPlanError(e.message)
     } finally {
@@ -1149,11 +1166,23 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
           )}
           {planLoading && <Spinner label="Generating game plan…" />}
           {planError && <div className="api-error">AI error: {planError}</div>}
-          {gamePlan && (
+          {gamePlan && !planMinimized && (
             <div className="game-plan">
-              <div className="game-plan-title">AI Game Plan</div>
+              <div className="game-plan-header">
+                <div className="game-plan-title">AI Game Plan</div>
+                <button className="game-plan-toggle-btn" onClick={() => setPlanMinimized(true)}>Minimize</button>
+              </div>
               <p className="game-plan-text">{gamePlan}</p>
               <button className="analyze-btn ai-plan-regen" onClick={getAIGamePlan}>Regenerate</button>
+            </div>
+          )}
+          {gamePlan && planMinimized && (
+            <div className="game-plan game-plan--minimized">
+              <div className="game-plan-header">
+                <div className="game-plan-title">AI Game Plan (minimized)</div>
+                <button className="game-plan-toggle-btn" onClick={() => setPlanMinimized(false)}>Expand</button>
+              </div>
+              <p className="game-plan-summary">{summarizePlan(gamePlan)}</p>
             </div>
           )}
         </div>
