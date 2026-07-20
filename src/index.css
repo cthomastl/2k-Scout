@@ -2,26 +2,27 @@
 
 /* ── Theme tokens — light is the default ── */
 :root {
-  --bg: #eef1f6;
+  --bg: #f7f4ea;
   --surface: #ffffff;
-  --surface-2: #f7f9fc;
-  --surface-3: #eef2f8;
-  --border: #e3e8ef;
-  --border-strong: #cbd5e1;
-  --border-faint: #eef1f6;
-  --text: #16202c;
-  --text-2: #334155;
-  --text-muted: #64748b;
-  --text-faint: #94a3b8;
-  --accent: #2563eb;
-  --accent-soft: #dbeafe;
+  --surface-2: #f2efe1;
+  --surface-3: #eae5d3;
+  --border: #e6e0cd;
+  --border-strong: #d3caac;
+  --border-faint: #efebdd;
+  --text: #17160f;
+  --text-2: #3a3728;
+  --text-muted: #736f5f;
+  --text-faint: #9d9784;
+  --accent: #15140d;
+  --accent-soft: #eae5d3;
   --error: #dc2626;
   --error-bg: #fef2f2;
   --error-border: #fecaca;
-  --rank-gold: #d97706;
-  --rank-bronze: #b45309;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 4px 16px rgba(16, 24, 40, 0.06);
-  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --rank-gold: #b45309;
+  --rank-bronze: #92561f;
+  --shadow: 0 1px 2px rgba(23, 22, 15, 0.04), 0 8px 24px rgba(23, 22, 15, 0.06);
+  --shadow-sm: 0 1px 2px rgba(23, 22, 15, 0.05);
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', Consolas, 'Liberation Mono', monospace;
 }
 
 [data-theme='dark'] {

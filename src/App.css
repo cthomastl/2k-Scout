@@ -20,6 +20,7 @@
   letter-spacing: -0.5px;
   color: var(--text);
   text-transform: uppercase;
+  font-family: var(--font-mono);
 }
 
 .app-subtitle {
@@ -55,13 +56,28 @@
   border-bottom: 1px solid var(--border);
 }
 
+.panel-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
 .panel-header h2 {
   font-size: 15px;
   font-weight: 700;
   color: var(--text);
   text-transform: uppercase;
+  font-family: var(--font-mono);
   letter-spacing: 0.5px;
-  margin-bottom: 10px;
+  margin-bottom: 0;
+}
+
+.team-logo {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .team-select {
@@ -120,6 +136,33 @@
 
 .player-card-header:hover {
   background: var(--surface-3);
+}
+
+.player-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top center;
+  flex-shrink: 0;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+}
+
+.player-avatar--sm {
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
+}
+
+.player-avatar--fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
 }
 
 .player-name {
@@ -225,6 +268,7 @@
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
+  font-family: var(--font-mono);
   letter-spacing: 0.8px;
   color: var(--text-muted);
   margin-bottom: 8px;
@@ -264,6 +308,7 @@
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
+  font-family: var(--font-mono);
   letter-spacing: 0.8px;
   color: var(--text-muted);
   margin-bottom: 8px;
@@ -347,6 +392,7 @@
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
+  font-family: var(--font-mono);
   letter-spacing: 0.8px;
   color: var(--text-faint);
   flex-shrink: 0;
@@ -376,6 +422,7 @@
   font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
+  font-family: var(--font-mono);
   letter-spacing: 0.5px;
   text-align: center;
   flex: 1;
@@ -433,6 +480,7 @@
   font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
+  font-family: var(--font-mono);
   letter-spacing: 0.6px;
   color: var(--text);
   margin-bottom: 4px;
@@ -496,6 +544,7 @@
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
+  font-family: var(--font-mono);
   letter-spacing: 0.5px;
   margin-bottom: 6px;
 }
@@ -530,6 +579,7 @@
   font-weight: 800;
   color: var(--text);
   text-transform: uppercase;
+  font-family: var(--font-mono);
   letter-spacing: 0.5px;
   margin-bottom: 4px;
 }
@@ -538,22 +588,35 @@
   color: var(--text-muted);
   font-size: 13px;
   margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.team-logo--inline {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
 }
 
 .analyze-btn {
   background: var(--accent);
   color: #fff;
   border: none;
-  border-radius: 8px;
-  padding: 10px 20px;
+  border-radius: 999px;
+  padding: 11px 22px;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: opacity 0.15s, transform 0.1s;
 }
 
 .analyze-btn:hover {
-  background: var(--accent);
+  opacity: 0.85;
+}
+
+.analyze-btn:active {
+  transform: scale(0.98);
 }
 
 .analysis-grid {
@@ -621,6 +684,7 @@
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
+  font-family: var(--font-mono);
   letter-spacing: 0.8px;
   color: var(--text-faint);
   margin-bottom: 6px;
@@ -654,20 +718,6 @@
 .analysis-row-block .analysis-row {
   padding: 0;
   border-bottom: none;
-}
-
-.badged-tag {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.12);
-  border-radius: 999px;
-  padding: 2px 8px;
-  margin-left: 6px;
-  vertical-align: middle;
 }
 
 .analysis-name {
@@ -764,6 +814,7 @@
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
+  font-family: var(--font-mono);
   letter-spacing: 0.4px;
   color: var(--accent);
   background: var(--accent-soft);
@@ -828,6 +879,7 @@
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
+  font-family: var(--font-mono);
   letter-spacing: 0.8px;
   color: var(--accent);
 }
@@ -1029,6 +1081,7 @@
   font-weight: 700;
   color: var(--text-faint);
   text-transform: uppercase;
+  font-family: var(--font-mono);
   letter-spacing: 0.08em;
   margin-bottom: 12px;
   padding-bottom: 8px;
@@ -1343,6 +1396,7 @@
   font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
+  font-family: var(--font-mono);
   letter-spacing: 0.06em;
   color: var(--text-muted);
   margin-bottom: 14px;
@@ -1419,6 +1473,7 @@
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
+  font-family: var(--font-mono);
   letter-spacing: 0.05em;
   color: var(--text-muted);
   margin-bottom: 6px;
@@ -1446,7 +1501,7 @@
 }
 .login-btn {
   padding: 12px;
-  border-radius: 10px;
+  border-radius: 999px;
   border: none;
   background: var(--accent);
   color: #fff;
