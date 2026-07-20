@@ -1,4 +1,17 @@
 import { useState, useEffect } from 'react'
+import {
+  LayoutDashboard, Search, BarChart3, Settings as SettingsIcon, LogOut, Sun, Moon,
+  Users, Target, Zap, ArrowRight, History as HistoryIcon, Loader2,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import { Skeleton } from '@/components/ui/skeleton'
 import './App.css'
 
 const API_KEY = import.meta.env.VITE_NBA2K_API_KEY ?? ''
@@ -19,26 +32,19 @@ async function apiFetch(path) {
   return res.json()
 }
 
-/* ── Icons (inline SVG — no emoji) ── */
-const Icon = ({ path, size = 18, stroke = 1.7, fill = 'none' }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke="currentColor"
-    strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    {path}
-  </svg>
-)
-const IconDashboard = p => <Icon {...p} path={<><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></>} />
-const IconScout = p => <Icon {...p} path={<><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></>} />
-const IconRankings = p => <Icon {...p} path={<><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></>} />
-const IconSettings = p => <Icon {...p} path={<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>} />
-const IconLogout = p => <Icon {...p} path={<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></>} />
-const IconSun = p => <Icon {...p} path={<><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>} />
-const IconMoon = p => <Icon {...p} path={<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>} />
-const IconUsers = p => <Icon {...p} path={<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></>} />
-const IconTarget = p => <Icon {...p} path={<><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></>} />
-const IconBolt = p => <Icon {...p} path={<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>} />
-const IconShield = p => <Icon {...p} path={<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>} />
-const IconArrowRight = p => <Icon {...p} path={<><path d="M5 12h14M12 5l7 7-7 7"/></>} />
-const IconHistory = p => <Icon {...p} path={<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></>} />
+/* ── Icons (lucide-react, wrapped to keep the app's historical 18px default) ── */
+const IconDashboard = p => <LayoutDashboard size={18} strokeWidth={1.7} {...p} />
+const IconScout = p => <Search size={18} strokeWidth={1.7} {...p} />
+const IconRankings = p => <BarChart3 size={18} strokeWidth={1.7} {...p} />
+const IconSettings = p => <SettingsIcon size={18} strokeWidth={1.7} {...p} />
+const IconLogout = p => <LogOut size={18} strokeWidth={1.7} {...p} />
+const IconSun = p => <Sun size={18} strokeWidth={1.7} {...p} />
+const IconMoon = p => <Moon size={18} strokeWidth={1.7} {...p} />
+const IconUsers = p => <Users size={18} strokeWidth={1.7} {...p} />
+const IconTarget = p => <Target size={18} strokeWidth={1.7} {...p} />
+const IconBolt = p => <Zap size={18} strokeWidth={1.7} {...p} />
+const IconArrowRight = p => <ArrowRight size={18} strokeWidth={1.7} {...p} />
+const IconHistory = p => <HistoryIcon size={18} strokeWidth={1.7} {...p} />
 
 function getRatingColor(val) {
   const n = parseInt(val, 10)
@@ -471,14 +477,21 @@ function computeMatchupEdges(myRoster, oppRoster) {
   ]
 }
 
+function TierBadge({ badge, className }) {
+  const color = getBadgeTierColor(badge.tier)
+  return (
+    <Badge variant="outline" className={className} style={{ borderColor: color, color }}>
+      {badge.name}{badge.tier ? ` · ${getBadgeTierLabel(badge.tier)}` : ''}
+    </Badge>
+  )
+}
+
 function DefBadgeChips({ badges }) {
   if (!badges || badges.length === 0) return null
   return (
-    <div className="badge-player-chips" style={{ marginTop: 4 }}>
+    <div className="mt-1 flex flex-wrap gap-1.5">
       {badges.map((b, j) => (
-        <span key={j} className="badge-chip small" style={{ borderColor: getBadgeTierColor(b.tier), color: getBadgeTierColor(b.tier) }}>
-          {b.name} · {getBadgeTierLabel(b.tier)}
-        </span>
+        <TierBadge key={j} badge={b} className="px-1.5 text-[11px] font-medium" />
       ))}
     </div>
   )
@@ -486,8 +499,8 @@ function DefBadgeChips({ badges }) {
 
 function Spinner({ small, label, center }) {
   return (
-    <div className={`spinner-wrap${center ? ' center-loading' : ''}`}>
-      <div className={`spinner${small ? ' spinner-sm' : ''}`} />
+    <div className={`flex flex-col items-center justify-center gap-3 p-8 text-sm text-muted-foreground${center ? ' mt-10' : ''}`}>
+      <Loader2 className={`animate-spin ${small ? 'size-5' : 'size-8'}`} />
       {label && <span>{label}</span>}
     </div>
   )
@@ -497,13 +510,13 @@ function Spinner({ small, label, center }) {
 // here because we already know exactly what's about to render.
 function RosterSkeleton({ rows = 6 }) {
   return (
-    <div className="roster-list" aria-hidden="true">
+    <div className="flex flex-col gap-2 p-2" aria-hidden="true">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="skeleton-row">
-          <div className="skeleton skeleton-avatar" />
-          <div className="skeleton-lines">
-            <div className="skeleton skeleton-line w-60" />
-            <div className="skeleton skeleton-line w-40" />
+        <div key={i} className="flex items-center gap-3 p-2">
+          <Skeleton className="size-7 rounded-full" />
+          <div className="flex flex-1 flex-col gap-1.5">
+            <Skeleton className="h-3 w-3/5" />
+            <Skeleton className="h-3 w-2/5" />
           </div>
         </div>
       ))}
@@ -576,16 +589,9 @@ function BadgeList({ badges }) {
   })
 
   return (
-    <div className="badge-list">
+    <div className="flex flex-wrap gap-1.5">
       {sorted.map((badge, i) => (
-        <span
-          key={i}
-          className="badge-chip"
-          style={{ borderColor: getBadgeTierColor(badge.tier), color: getBadgeTierColor(badge.tier) }}
-        >
-          {badge.name}
-          {badge.tier && <span className="badge-tier"> · {getBadgeTierLabel(badge.tier)}</span>}
-        </span>
+        <TierBadge key={i} badge={badge} className="font-medium" />
       ))}
     </div>
   )
@@ -625,11 +631,10 @@ function PlayerCard({ player, teamName }) {
   return (
     <div className={`player-card ${expanded ? 'expanded' : ''}`}>
       <button className="player-card-header" onClick={handleExpand} aria-expanded={expanded}>
-        {player.playerImage ? (
-          <img className="player-avatar" src={player.playerImage} alt="" onError={e => { e.target.style.visibility = 'hidden' }} />
-        ) : (
-          <span className="player-avatar player-avatar--fallback">{player.name?.[0] ?? '?'}</span>
-        )}
+        <Avatar className="size-7">
+          {player.playerImage && <AvatarImage src={player.playerImage} alt="" />}
+          <AvatarFallback>{player.name?.[0] ?? '?'}</AvatarFallback>
+        </Avatar>
         <span className="player-name">{player.name}</span>
         <span className="player-meta">
           {player.positions && <span className="player-pos">{Array.isArray(player.positions) ? player.positions[0] : player.positions}</span>}
@@ -727,16 +732,6 @@ function TeamPanel({ side, selectedTeam, onTeamChange, teams, roster, loading, e
       )}
     </div>
   )
-}
-
-function findWeakLinks(roster, rosterDetails, statKey, label) {
-  const withStats = rosterDetails.filter(p => p && p[statKey] !== undefined)
-  if (!withStats.length) return null
-  const sorted = [...withStats].sort((a, b) => parseInt(a[statKey]) - parseInt(b[statKey]))
-  return sorted.slice(0, 3).map(p => ({
-    name: p.name || p.player_name,
-    value: p[statKey],
-  }))
 }
 
 function dedupeByName(list) {
@@ -958,13 +953,15 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam, token
         })}
       </div>
 
-      <div className="analyzer-tabs">
-        {TABS.map(tab => (
-          <button key={tab.id} className={`analyzer-tab${activeTab === tab.id ? ' active' : ''}`} onClick={() => setActiveTab(tab.id)}>
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
+        <TabsList className="h-auto w-full flex-wrap justify-start">
+          {TABS.map(tab => (
+            <TabsTrigger key={tab.id} value={tab.id} className="flex-none">
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
       {activeTab === 'scouting' && (
         <div className="analysis-grid">
@@ -1138,11 +1135,9 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam, token
                   {' '}{p.name}
                 </div>
                 {p.badges.length > 0 ? (
-                  <div className="badge-player-chips">
+                  <div className="flex flex-wrap gap-1.5">
                     {p.badges.map((b, j) => (
-                      <span key={j} className="badge-chip small" style={{ borderColor: getBadgeTierColor(b.tier), color: getBadgeTierColor(b.tier) }}>
-                        {b.name} · {getBadgeTierLabel(b.tier)}
-                      </span>
+                      <TierBadge key={j} badge={b} className="px-1.5 text-[11px] font-medium" />
                     ))}
                   </div>
                 ) : (
@@ -1307,11 +1302,10 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam, token
                 const stat = lineup.getStat(p)
                 return (
                   <div key={j} className="lineup-player-row">
-                    {p.playerImage ? (
-                      <img className="player-avatar player-avatar--sm" src={p.playerImage} alt="" onError={e => { e.target.style.visibility = 'hidden' }} />
-                    ) : (
-                      <span className="player-avatar player-avatar--sm player-avatar--fallback">{p.name?.[0] ?? '?'}</span>
-                    )}
+                    <Avatar className="size-5">
+                      {p.playerImage && <AvatarImage src={p.playerImage} alt="" />}
+                      <AvatarFallback className="text-[9px]">{p.name?.[0] ?? '?'}</AvatarFallback>
+                    </Avatar>
                     <span className="lineup-player-pos">{(p.positions||[])[0] || '—'}</span>
                     <span className="lineup-player-name">{p.name}</span>
                     <span className="lineup-player-stat" style={{ color: getRatingColor(stat.val) }}>{stat.label} {stat.val}</span>
@@ -1325,10 +1319,10 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam, token
 
       {activeTab === 'ai-plan' && (
         <div className="ai-plan-tab">
-          <div className="strategy-input-group">
-            <label className="strategy-label">Opponent's offensive strategy (optional)</label>
-            <textarea
-              className="strategy-textarea"
+          <div className="mb-4 flex flex-col gap-1.5">
+            <Label htmlFor="opponent-strategy">Opponent's offensive strategy (optional)</Label>
+            <Textarea
+              id="opponent-strategy"
               placeholder="e.g. heavy pick and roll with their center, lots of corner 3s, iso-heavy on their best player..."
               value={opponentStrategy}
               onChange={e => setOpponentStrategy(e.target.value)}
@@ -1336,28 +1330,32 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam, token
             />
           </div>
           {!planLoading && !gamePlan && (
-            <button className="analyze-btn ai-plan-btn" onClick={getAIGamePlan}>Get AI Game Plan</button>
+            <Button className="mt-2" onClick={getAIGamePlan}>Get AI Game Plan</Button>
           )}
           {planLoading && <Spinner label="Generating game plan…" />}
           {planError && <div className="api-error">AI error: {planError}</div>}
           {gamePlan && !planMinimized && (
-            <div className="game-plan">
-              <div className="game-plan-header">
-                <div className="game-plan-title">AI Game Plan</div>
-                <button className="game-plan-toggle-btn" onClick={() => setPlanMinimized(true)}>Minimize</button>
-              </div>
-              <p className="game-plan-text">{gamePlan}</p>
-              <button className="analyze-btn ai-plan-regen" onClick={getAIGamePlan}>Regenerate</button>
-            </div>
+            <Card className="mt-4 gap-0">
+              <CardContent className="pt-5">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">AI Game Plan</div>
+                  <Button variant="outline" size="sm" onClick={() => setPlanMinimized(true)}>Minimize</Button>
+                </div>
+                <p className="game-plan-text">{gamePlan}</p>
+                <Button variant="secondary" size="sm" className="mt-3" onClick={getAIGamePlan}>Regenerate</Button>
+              </CardContent>
+            </Card>
           )}
           {gamePlan && planMinimized && (
-            <div className="game-plan game-plan--minimized">
-              <div className="game-plan-header">
-                <div className="game-plan-title">AI Game Plan (minimized)</div>
-                <button className="game-plan-toggle-btn" onClick={() => setPlanMinimized(false)}>Expand</button>
-              </div>
-              <p className="game-plan-summary">{summarizePlan(gamePlan)}</p>
-            </div>
+            <Card className="mt-4 gap-0">
+              <CardContent className="py-4">
+                <div className="mb-1 flex items-center justify-between gap-3">
+                  <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">AI Game Plan (minimized)</div>
+                  <Button variant="outline" size="sm" onClick={() => setPlanMinimized(false)}>Expand</Button>
+                </div>
+                <p className="text-xs leading-relaxed text-muted-foreground">{summarizePlan(gamePlan)}</p>
+              </CardContent>
+            </Card>
           )}
         </div>
       )}
@@ -1491,9 +1489,9 @@ function TeamRankings({ teams, teamsLoading }) {
 
 function HistorySkeleton({ rows = 4 }) {
   return (
-    <div className="history-list" aria-hidden="true">
+    <div className="flex flex-col gap-3" aria-hidden="true">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="skeleton skeleton-card" />
+        <Skeleton key={i} className="h-16 w-full rounded-xl" />
       ))}
     </div>
   )
@@ -1523,7 +1521,7 @@ function GameplanHistory({ token }) {
 
   if (items.length === 0) {
     return (
-      <div className="history-empty">
+      <div className="flex flex-col items-center gap-3 py-16 text-center text-sm text-muted-foreground">
         <IconHistory size={32} />
         <p>No saved game plans yet — generate one from the Scout tab and it'll show up here.</p>
       </div>
@@ -1531,15 +1529,23 @@ function GameplanHistory({ token }) {
   }
 
   return (
-    <div className="history-list">
+    <div className="flex flex-col gap-3">
       {items.map(item => (
-        <div key={item.id} className="history-card" onClick={() => setOpenId(openId === item.id ? null : item.id)}>
-          <div className="history-card-head">
-            <div className="history-matchup">{item.team_a} <span className="history-vs">vs</span> {item.team_b}</div>
-            <div className="history-date">{new Date(item.created_at).toLocaleString()}</div>
-          </div>
-          {openId === item.id && <p className="game-plan-text history-body">{item.generated_text}</p>}
-        </div>
+        <Card
+          key={item.id}
+          className="cursor-pointer gap-0 transition-colors hover:border-ring/40"
+          onClick={() => setOpenId(openId === item.id ? null : item.id)}
+        >
+          <CardContent className="py-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-sm font-semibold">
+                {item.team_a} <span className="font-normal text-muted-foreground">vs</span> {item.team_b}
+              </div>
+              <div className="text-xs text-muted-foreground">{new Date(item.created_at).toLocaleString()}</div>
+            </div>
+            {openId === item.id && <p className="game-plan-text mt-3 border-t pt-3">{item.generated_text}</p>}
+          </CardContent>
+        </Card>
       ))}
     </div>
   )
@@ -1617,91 +1623,106 @@ function Login({ onLogin, theme, onToggleTheme }) {
   }
 
   return (
-    <div className="login-screen">
-      <button className="theme-toggle login-theme-toggle" onClick={onToggleTheme} title="Toggle theme">
+    <div className="flex min-h-svh items-center justify-center bg-background p-4">
+      <Button
+        variant="outline" size="icon" className="absolute top-4 right-4"
+        onClick={onToggleTheme} title="Toggle theme"
+      >
         {theme === 'light' ? <IconMoon /> : <IconSun />}
-      </button>
-      <form className="login-card" onSubmit={submit}>
-        <div className="login-brand">
-          <span className="brand-mark">2K</span>
-          <span className="brand-name">Scout DEV2</span>
-        </div>
-        <h1 className="login-title">{isSignup ? 'Create account' : 'Sign in'}</h1>
-        <p className="login-sub">Pre-game scouting for NBA 2K All-Time teams</p>
+      </Button>
+      <Card className="w-full max-w-sm">
+        <CardContent className="pt-6">
+          <form className="flex flex-col gap-4" onSubmit={submit}>
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-sm font-extrabold text-primary-foreground">2K</span>
+              <span className="text-lg font-extrabold tracking-tight">Scout DEV2</span>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold">{isSignup ? 'Create account' : 'Sign in'}</h1>
+              <p className="text-sm text-muted-foreground">Pre-game scouting for NBA 2K All-Time teams</p>
+            </div>
 
-        <label className="login-label">Email</label>
-        <input className="login-input" type="email" autoComplete="username"
-          value={email} onChange={e => setEmail(e.target.value)} placeholder="scout@2kscout.app" required />
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="login-email">Email</Label>
+              <Input id="login-email" type="email" autoComplete="username"
+                value={email} onChange={e => setEmail(e.target.value)} placeholder="scout@2kscout.app" required />
+            </div>
 
-        <label className="login-label">Password</label>
-        <input className="login-input" type="password" autoComplete={isSignup ? 'new-password' : 'current-password'}
-          value={password} onChange={e => setPassword(e.target.value)}
-          placeholder={isSignup ? 'At least 6 characters' : '••••••••'} required minLength={isSignup ? 6 : undefined} />
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="login-password">Password</Label>
+              <Input id="login-password" type="password" autoComplete={isSignup ? 'new-password' : 'current-password'}
+                value={password} onChange={e => setPassword(e.target.value)}
+                placeholder={isSignup ? 'At least 6 characters' : '••••••••'} required minLength={isSignup ? 6 : undefined} />
+            </div>
 
-        {error && <div className="login-error">{error}</div>}
+            {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
 
-        <button className="login-btn" type="submit" disabled={busy}>
-          {busy
-            ? (isSignup ? 'Creating account…' : 'Signing in…')
-            : (isSignup ? 'Create account' : 'Sign In')}
-        </button>
+            <Button type="submit" size="lg" disabled={busy}>
+              {busy
+                ? (isSignup ? 'Creating account…' : 'Signing in…')
+                : (isSignup ? 'Create account' : 'Sign In')}
+            </Button>
 
-        <button type="button" className="login-mode-toggle" onClick={toggleMode}>
-          {isSignup ? 'Already have an account? Sign in' : "Don't have an account? Create one"}
-        </button>
+            <Button type="button" variant="link" size="sm" onClick={toggleMode}>
+              {isSignup ? 'Already have an account? Sign in' : "Don't have an account? Create one"}
+            </Button>
 
-        {!isSignup && (
-          <div className="login-demo">
-            Demo access — <strong>{DEMO_EMAIL}</strong> / <strong>{DEMO_PASSWORD}</strong>
-          </div>
-        )}
-      </form>
+            {!isSignup && (
+              <div className="rounded-lg bg-muted px-3 py-2 text-center text-xs text-muted-foreground">
+                Demo access — <strong>{DEMO_EMAIL}</strong> / <strong>{DEMO_PASSWORD}</strong>
+              </div>
+            )}
+          </form>
+        </CardContent>
+      </Card>
     </div>
   )
 }
 
 function StatCard({ icon, label, value, hint }) {
   return (
-    <div className="dash-stat-card">
-      <div className="dash-stat-icon">{icon}</div>
-      <div className="dash-stat-value">{value}</div>
-      <div className="dash-stat-label">{label}</div>
-      {hint && <div className="dash-stat-hint">{hint}</div>}
-    </div>
+    <Card className="gap-0">
+      <CardContent className="pt-5">
+        <div className="mb-3 flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">{icon}</div>
+        <div className="text-2xl font-extrabold">{value}</div>
+        <div className="text-sm font-semibold">{label}</div>
+        {hint && <div className="mt-0.5 text-xs text-muted-foreground">{hint}</div>}
+      </CardContent>
+    </Card>
   )
 }
 
 function DashboardHome({ user, teams, teamsLoading, myTeam, oppTeam, onStart, onRankings }) {
   const ready = myTeam && oppTeam
   return (
-    <div className="dash-home">
-      <div className="dash-welcome">
-        <h2 className="dash-welcome-title">Welcome back, {user?.name || 'Scout'}</h2>
-        <p className="dash-welcome-sub">Scout any two All-Time rosters and build a game plan from pure 2K ratings.</p>
+    <div className="flex flex-col gap-6">
+      <div>
+        <h2 className="text-2xl font-extrabold tracking-tight">Welcome back, {user?.name || 'Scout'}</h2>
+        <p className="text-sm text-muted-foreground">Scout any two All-Time rosters and build a game plan from pure 2K ratings.</p>
       </div>
 
-      <div className="dash-stats-grid">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={<IconUsers />} label="All-Time Teams" value={teamsLoading ? '—' : teams.length} hint="Available to scout" />
         <StatCard icon={<IconTarget />} label="Current Matchup" value={ready ? 'Ready' : 'None'} hint={ready ? `${myTeam} vs ${oppTeam}` : 'Pick two teams to begin'} />
         <StatCard icon={<IconRankings />} label="Ranking Categories" value="5" hint="Speed · Def · 3PT · Reb" />
         <StatCard icon={<IconBolt />} label="AI Game Plans" value="On" hint="Powered by Claude" />
       </div>
 
-      <div className="dash-cta-row">
-        <button className="dash-cta primary" onClick={onStart}>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Button size="lg" className="h-auto justify-between rounded-xl p-5 text-left" onClick={onStart}>
           <div>
-            <div className="dash-cta-title">Start a Matchup</div>
-            <div className="dash-cta-sub">Select your team and an opponent</div>
+            <div className="text-[15px] font-bold">Start a Matchup</div>
+            <div className="text-[13px] font-normal opacity-80">Select your team and an opponent</div>
           </div>
           <IconArrowRight size={20} />
-        </button>
-        <button className="dash-cta" onClick={onRankings}>
+        </Button>
+        <Button variant="outline" size="lg" className="h-auto justify-between rounded-xl p-5 text-left" onClick={onRankings}>
           <div>
-            <div className="dash-cta-title">Browse Team Rankings</div>
-            <div className="dash-cta-sub">League-wide stat leaderboards</div>
+            <div className="text-[15px] font-bold">Browse Team Rankings</div>
+            <div className="text-[13px] font-normal opacity-80">League-wide stat leaderboards</div>
           </div>
           <IconArrowRight size={20} />
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -1798,39 +1819,50 @@ export default function App() {
   const pageTitle = NAV_ITEMS.find(n => n.id === page)?.label || 'Dashboard'
 
   return (
-    <div className="layout">
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <span className="brand-mark">2K</span>
-          <span className="brand-name">Scout DEV</span>
+    <div className="flex min-h-svh">
+      <aside className="sticky top-0 flex h-svh w-[230px] shrink-0 flex-col gap-1.5 border-r bg-card p-4">
+        <div className="flex items-center gap-2.5 px-2 pb-5">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-sm font-extrabold text-primary-foreground">2K</span>
+          <span className="text-[17px] font-extrabold tracking-tight">Scout DEV</span>
         </div>
-        <nav className="sidebar-nav">
+        <nav className="flex flex-col gap-1">
           {NAV_ITEMS.map(({ id, label, Icon }) => (
-            <button key={id} className={`sidebar-link${page === id ? ' active' : ''}`} onClick={() => setPage(id)}>
+            <Button
+              key={id}
+              variant={page === id ? 'default' : 'ghost'}
+              className="justify-start gap-2.5 rounded-lg"
+              onClick={() => setPage(id)}
+            >
               <Icon /><span>{label}</span>
-            </button>
+            </Button>
           ))}
         </nav>
-        <button className="sidebar-link sidebar-logout" onClick={handleLogout}>
+        <Button
+          variant="ghost"
+          className="mt-auto justify-start gap-2.5 rounded-lg text-muted-foreground hover:text-destructive"
+          onClick={handleLogout}
+        >
           <IconLogout /><span>Logout</span>
-        </button>
+        </Button>
       </aside>
 
-      <div className="main">
-        <header className="topbar">
-          <h1 className="topbar-title">{pageTitle}</h1>
-          <div className="topbar-actions">
-            <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-card/80 px-6 py-3 backdrop-blur">
+          <h1 className="text-lg font-bold">{pageTitle}</h1>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="icon" onClick={toggleTheme} title="Toggle theme">
               {theme === 'light' ? <IconMoon /> : <IconSun />}
-            </button>
-            <div className="topbar-user">
-              <span className="user-avatar">{initials}</span>
-              <span className="user-name">{user?.name || 'Scout'}</span>
+            </Button>
+            <div className="flex items-center gap-2">
+              <Avatar className="size-8 border-0 bg-primary">
+                <AvatarFallback className="bg-primary text-xs text-primary-foreground">{initials}</AvatarFallback>
+              </Avatar>
+              <span className="text-sm font-semibold">{user?.name || 'Scout'}</span>
             </div>
           </div>
         </header>
 
-        <main className="content">
+        <main className="flex-1 p-6">
           {page === 'dashboard' && (
             <DashboardHome
               user={user}
@@ -1871,31 +1903,35 @@ export default function App() {
           )}
 
           {page === 'settings' && (
-            <div className="settings-page">
-              <div className="settings-card">
-                <div className="settings-card-title">Appearance</div>
-                <div className="settings-row">
-                  <div>
-                    <div className="settings-row-label">Theme</div>
-                    <div className="settings-row-hint">Switch between light and dark mode</div>
+            <div className="mx-auto flex max-w-xl flex-col gap-4">
+              <Card className="gap-0">
+                <CardContent className="pt-5">
+                  <div className="mb-3 text-xs font-bold tracking-widest uppercase text-muted-foreground">Appearance</div>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-semibold">Theme</div>
+                      <div className="text-xs text-muted-foreground">Switch between light and dark mode</div>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={toggleTheme}>
+                      {theme === 'light' ? <><IconMoon size={16} /> Dark</> : <><IconSun size={16} /> Light</>}
+                    </Button>
                   </div>
-                  <button className="settings-theme-btn" onClick={toggleTheme}>
-                    {theme === 'light' ? <><IconMoon size={16} /> Dark</> : <><IconSun size={16} /> Light</>}
-                  </button>
-                </div>
-              </div>
-              <div className="settings-card">
-                <div className="settings-card-title">Account</div>
-                <div className="settings-row">
-                  <div>
-                    <div className="settings-row-label">{user?.name || 'Scout'}</div>
-                    <div className="settings-row-hint">{user?.email || DEMO_EMAIL}</div>
+                </CardContent>
+              </Card>
+              <Card className="gap-0">
+                <CardContent className="pt-5">
+                  <div className="mb-3 text-xs font-bold tracking-widest uppercase text-muted-foreground">Account</div>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-semibold">{user?.name || 'Scout'}</div>
+                      <div className="text-xs text-muted-foreground">{user?.email || DEMO_EMAIL}</div>
+                    </div>
+                    <Button variant="outline" size="sm" className="hover:border-destructive hover:text-destructive" onClick={handleLogout}>
+                      <IconLogout size={16} /> Logout
+                    </Button>
                   </div>
-                  <button className="settings-logout-btn" onClick={handleLogout}>
-                    <IconLogout size={16} /> Logout
-                  </button>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
           )}
         </main>
