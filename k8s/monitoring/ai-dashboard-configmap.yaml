@@ -87,14 +87,19 @@ data:
         },
         {
           "id": 5,
-          "title": "Claude Call Latency (p95)",
+          "title": "Claude Call Latency (p95/p99)",
           "type": "timeseries",
           "datasource": "${datasource}",
+          "description": "This is the one call in the app most likely to take a real, noticeable amount of time — LLM generation isn't instant. p99 matters more here than on most panels: it's the number your most-affected users actually experience, and generation time has a much fatter tail than a typical CRUD endpoint.",
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
           "targets": [
             {
               "expr": "histogram_quantile(0.95, sum(rate(anthropic_request_duration_seconds_bucket[5m])) by (le))",
               "legendFormat": "p95"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(anthropic_request_duration_seconds_bucket[5m])) by (le))",
+              "legendFormat": "p99"
             }
           ],
           "fieldConfig": { "defaults": { "unit": "s" } }
@@ -128,6 +133,16 @@ data:
             }
           ],
           "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 3 } }
+        },
+        {
+          "id": 8,
+          "title": "Known Gap: No Fallback on Claude Failure",
+          "type": "text",
+          "gridPos": { "h": 4, "w": 24, "x": 0, "y": 21 },
+          "options": {
+            "mode": "markdown",
+            "content": "**There is currently no degraded mode.** If the Anthropic API call in `POST /api/gameplan` fails outright (rate limit, outage, timeout), the user gets a generic `500` — there's no simpler rules-based matchup summary served as a fallback. The **Claude Errors by Type** panel above tells you *that* and *why* it's failing, but every failure there is a failure the user sees, full stop. If this ever needs to be more resilient, a fallback path would need its own usage-rate metric (e.g. `ai_fallback_used_total`) so degraded-mode traffic stays visible instead of silently blending into the 'success' numbers."
+          }
         }
       ]
     }

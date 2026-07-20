@@ -13,6 +13,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { reportTimeToInteractive } from '@/lib/metrics'
 import './App.css'
 
 const API_KEY = import.meta.env.VITE_NBA2K_API_KEY ?? ''
@@ -1782,6 +1783,12 @@ export default function App() {
   const [oppRoster, setOppRoster] = useState([])
   const [oppRosterLoading, setOppRosterLoading] = useState(false)
   const [oppRosterError, setOppRosterError] = useState(null)
+
+  // Once, on first mount — an approximation of time-to-interactive. Deps
+  // deliberately empty; this isn't meant to re-fire on re-renders.
+  useEffect(() => {
+    reportTimeToInteractive()
+  }, [])
 
   useEffect(() => {
     if (!token) return

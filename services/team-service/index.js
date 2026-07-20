@@ -36,6 +36,29 @@ const cacheMisses = new client.Counter({
   registers: [register],
 })
 
+// A cache hit rate alone can't tell you if you're serving stale data — this
+// tracks how old a served cache entry actually was, independent of whether
+// it "worked." 2K ratings do change across patches, so a healthy hit rate
+// with a climbing age is a real (silent) problem: correct-looking responses
+// that are quietly out of date.
+const cacheEntryAge = new client.Histogram({
+  name: 'cache_entry_age_seconds',
+  help: 'Age of a cache entry at the time it was served (time since it was fetched from nba2kapi.com)',
+  buckets: [1, 10, 60, 300, 900, 1800, 3600],
+  registers: [register],
+})
+
+// Isolated from this service's own http_request_duration_seconds status
+// codes on purpose — the same principle as ai-service's ai_errors_total:
+// "nba2kapi is down" and "we have a bug" need different responses, and a
+// blended error rate can't tell them apart.
+const upstreamRequests = new client.Counter({
+  name: 'nba2kapi_upstream_requests_total',
+  help: 'Requests to api.nba2kapi.com by outcome',
+  labelNames: ['outcome'], // 'success' | 'error'
+  registers: [register],
+})
+
 app.use((req, res, next) => {
   const end = httpRequestDuration.startTimer()
   res.on('finish', () => {
@@ -69,7 +92,9 @@ app.get('/api/*', async (req, res) => {
     const cached = await redis.get(key)
     if (cached !== null) {
       cacheHits.inc()
-      return res.status(200).json(JSON.parse(cached))
+      const { cachedAt, data } = JSON.parse(cached)
+      cacheEntryAge.observe((Date.now() - cachedAt) / 1000)
+      return res.status(200).json(data)
     }
   } catch (err) {
     console.error('Redis read error (continuing without cache):', err.message)
@@ -92,6 +117,7 @@ app.get('/api/*', async (req, res) => {
 
     if (!upstreamRes.ok) {
       const text = await upstreamRes.text()
+      upstreamRequests.inc({ outcome: 'error' })
       console.error(`nba2kapi upstream error: GET ${req.originalUrl} -> ${upstreamRes.status} (${upstreamMs}ms)`)
       return res.status(upstreamRes.status).json({
         error: `Upstream error ${upstreamRes.status}`,
@@ -99,15 +125,17 @@ app.get('/api/*', async (req, res) => {
       })
     }
 
+    upstreamRequests.inc({ outcome: 'success' })
     console.log(`nba2kapi upstream: GET ${req.originalUrl} -> ${upstreamRes.status} (${upstreamMs}ms)`)
     const data = await upstreamRes.json()
     try {
-      await redis.setEx(key, CACHE_TTL_SECONDS, JSON.stringify(data))
+      await redis.setEx(key, CACHE_TTL_SECONDS, JSON.stringify({ cachedAt: Date.now(), data }))
     } catch (err) {
       console.error('Redis write error (continuing without cache):', err.message)
     }
     return res.status(200).json(data)
   } catch (err) {
+    upstreamRequests.inc({ outcome: 'error' })
     console.error('Proxy error:', err)
     return res.status(502).json({ error: err.message || 'Upstream request failed' })
   }

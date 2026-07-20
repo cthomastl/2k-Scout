@@ -426,6 +426,176 @@ data:
           "fieldConfig": {
             "defaults": { "unit": "short" }
           }
+        },
+        {
+          "id": 24,
+          "title": "Service-Specific Signals",
+          "type": "row",
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 70 },
+          "panels": []
+        },
+        {
+          "id": 25,
+          "title": "Gateway: Request Rate by Route",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "description": "Gateway path-routes to three different services (ai-service, team-service, auth-service) — a blended request rate hides that /api/gameplan behaves nothing like /auth/login. Split by route instead of by job so each downstream's traffic shape is visible on its own.",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 71 },
+          "targets": [
+            {
+              "expr": "sum(rate(http_request_duration_seconds_count{job=\"gateway\"}[5m])) by (route)",
+              "legendFormat": "{{route}}"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "reqps" } }
+        },
+        {
+          "id": 26,
+          "title": "Gateway: Error Rate by Route",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "description": "Tells you instantly which downstream is having a bad day — a spike isolated to /api/gameplan means ai-service (or Claude itself), not team-service or auth-service.",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 71 },
+          "targets": [
+            {
+              "expr": "clamp_max(sum(rate(http_request_duration_seconds_count{job=\"gateway\", status_code=~\"5..\"}[5m])) by (route) / sum(rate(http_request_duration_seconds_count{job=\"gateway\"}[5m])) by (route), 1)",
+              "legendFormat": "{{route}}"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } }
+        },
+        {
+          "id": 27,
+          "title": "Gateway: p95 Latency by Route",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "description": "Blended latency would hide a slow ai-service call inside an otherwise-healthy average — /api/gameplan is expected to run structurally higher here than /api/teams or /auth/login (Claude generation time, not a bug).",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 71 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"gateway\"}[5m])) by (le, route))",
+              "legendFormat": "{{route}}"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "s" } }
+        },
+        {
+          "id": 28,
+          "title": "Team-Service: Cache Hit Rate",
+          "type": "stat",
+          "datasource": "${datasource}",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 79 },
+          "targets": [
+            {
+              "expr": "sum(increase(cache_hits_total{job=\"team-service\"}[1h])) / (sum(increase(cache_hits_total{job=\"team-service\"}[1h])) + sum(increase(cache_misses_total{job=\"team-service\"}[1h])))",
+              "legendFormat": "hit rate"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } }
+        },
+        {
+          "id": 29,
+          "title": "Team-Service: Cache Entry Age (p50/p95)",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "description": "A cache hit rate alone can't tell you if you're serving stale data. 2K ratings change across patches — a healthy hit rate with climbing age is a silent problem: correct-looking responses that are quietly out of date. Bounded by the 1h cache TTL (CACHE_TTL_SECONDS in team-service/index.js); age should never exceed that.",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 79 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, sum(rate(cache_entry_age_seconds_bucket{job=\"team-service\"}[5m])) by (le))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(cache_entry_age_seconds_bucket{job=\"team-service\"}[5m])) by (le))",
+              "legendFormat": "p95"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "s" } }
+        },
+        {
+          "id": 30,
+          "title": "Team-Service: nba2kapi Upstream Error Rate",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "description": "Isolated from team-service's own http_request_duration_seconds status codes on purpose — same principle as ai-service's Claude error tracking. 'nba2kapi is down' and 'we have a bug' need different responses, and a blended error rate can't tell them apart.",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 79 },
+          "targets": [
+            {
+              "expr": "clamp_max(sum(rate(nba2kapi_upstream_requests_total{job=\"team-service\", outcome=\"error\"}[5m])) / sum(rate(nba2kapi_upstream_requests_total{job=\"team-service\"}[5m])), 1)",
+              "legendFormat": "error rate"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } }
+        },
+        {
+          "id": 31,
+          "title": "Auth: Failed Login Rate",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "description": "A spike here is a security signal (credential stuffing, a leaked password list being tried) as much as a UX one — not just 'users mistyping passwords.'",
+          "gridPos": { "h": 8, "w": 6, "x": 0, "y": 87 },
+          "targets": [
+            {
+              "expr": "clamp_max(sum(rate(http_request_duration_seconds_count{job=\"auth-service\", route=\"/auth/login\", status_code=\"401\"}[5m])) / sum(rate(http_request_duration_seconds_count{job=\"auth-service\", route=\"/auth/login\"}[5m])), 1)",
+              "legendFormat": "failed login rate"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "color": { "mode": "fixed", "fixedColor": "orange" }
+            }
+          }
+        },
+        {
+          "id": 32,
+          "title": "Auth: Login Latency (p95)",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "description": "Login is both critical and expected to be fast — nobody tolerates a slow login the way they might tolerate a slow report generation.",
+          "gridPos": { "h": 8, "w": 6, "x": 6, "y": 87 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"auth-service\", route=\"/auth/login\"}[5m])) by (le))",
+              "legendFormat": "p95"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "s" } }
+        },
+        {
+          "id": 33,
+          "title": "Frontend: JS Error Rate",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "description": "Uncaught exceptions and unhandled promise rejections in the browser — reported by src/lib/metrics.js to gateway's POST /api/client-metrics. A healthy backend doesn't guarantee the SPA actually renders; this is the only panel on either dashboard that can see a JS bug in the matchup-calculation/rendering logic, since it never touches a backend endpoint at all.",
+          "gridPos": { "h": 8, "w": 6, "x": 12, "y": 87 },
+          "targets": [
+            {
+              "expr": "rate(frontend_js_errors_total{job=\"gateway\"}[5m])",
+              "legendFormat": "errors/s"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "red" } }
+          }
+        },
+        {
+          "id": 34,
+          "title": "Frontend: Time-to-Interactive (p95)",
+          "type": "timeseries",
+          "datasource": "${datasource}",
+          "description": "Navigation start to the app's first render, reported once per page load. An approximation, not the strict web-vitals TTI — good enough to catch 'the app got a lot slower to show up,' which is what's actually worth alerting on. A healthy p95 latency on every backend panel above doesn't guarantee this looks healthy too — a large JS bundle or slow third-party font load wouldn't show up anywhere else on either dashboard.",
+          "gridPos": { "h": 8, "w": 6, "x": 18, "y": 87 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(frontend_time_to_interactive_seconds_bucket{job=\"gateway\"}[5m])) by (le))",
+              "legendFormat": "p95"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "s" } }
         }
       ]
     }
