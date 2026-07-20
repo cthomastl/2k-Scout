@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 import './App.css'
 
 const API_KEY = import.meta.env.VITE_NBA2K_API_KEY ?? ''
@@ -52,6 +53,30 @@ function getRatingColor(val) {
   if (n >= 90) return '#22c55e'
   if (n >= 75) return '#eab308'
   return '#ef4444'
+}
+
+// 2K card-tier chip colors (Galaxy Opal → Pink Diamond → Diamond → Amethyst → base),
+// matching the rating pills on the nba2kapi reference design.
+function ratingChipBackground(val) {
+  const n = parseInt(val, 10)
+  if (isNaN(n)) return '#a8a29e'
+  if (n >= 95) return 'linear-gradient(135deg, #d946ef, #8b5cf6)'
+  if (n >= 90) return '#a855f7'
+  if (n >= 85) return '#3b82f6'
+  if (n >= 80) return '#f59e0b'
+  return '#78716c'
+}
+
+function RatingChip({ value, className }) {
+  if (value == null || value === '—') return null
+  return (
+    <span
+      className={cn('inline-flex min-w-8 items-center justify-center rounded-md px-1.5 py-0.5 font-mono text-xs font-bold text-white', className)}
+      style={{ background: ratingChipBackground(value) }}
+    >
+      {value}
+    </span>
+  )
 }
 
 function getBadgeTierColor(tier) {
@@ -563,7 +588,7 @@ const DEFENSE_STATS = [
 
 const ATHLETIC_STATS = [
   { label: 'Speed', key: 'speed' },
-  { label: 'Acceleration', key: 'acceleration' },
+  { label: 'Agility', key: 'agility' },
   { label: 'Strength', key: 'strength' },
   { label: 'Vertical', key: 'vertical' },
 ]
@@ -631,18 +656,18 @@ function PlayerCard({ player, teamName }) {
   return (
     <div className={`player-card ${expanded ? 'expanded' : ''}`}>
       <button className="player-card-header" onClick={handleExpand} aria-expanded={expanded}>
-        <Avatar className="size-7">
+        <Avatar className="size-8">
           {player.playerImage && <AvatarImage src={player.playerImage} alt="" />}
           <AvatarFallback>{player.name?.[0] ?? '?'}</AvatarFallback>
         </Avatar>
         <span className="player-name">{player.name}</span>
         <span className="player-meta">
-          {player.positions && <span className="player-pos">{Array.isArray(player.positions) ? player.positions[0] : player.positions}</span>}
-          {overall && (
-            <span className="player-overall" style={{ color: getRatingColor(overall) }}>
-              {overall}
+          {player.positions && (
+            <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+              {Array.isArray(player.positions) ? player.positions[0] : player.positions}
             </span>
           )}
+          {overall && <RatingChip value={overall} />}
         </span>
         <span className="expand-arrow">{expanded ? '▲' : '▼'}</span>
       </button>
@@ -654,12 +679,10 @@ function PlayerCard({ player, teamName }) {
           {detail && !loading && (
             <div className="player-detail">
               {detail.playerImage && (
-                <img
-                  className="player-headshot"
-                  src={detail.playerImage}
-                  alt={detail.name}
-                  onError={e => { e.target.style.display = 'none' }}
-                />
+                <Avatar className="size-16 self-center border-2">
+                  <AvatarImage src={detail.playerImage} alt={detail.name} />
+                  <AvatarFallback className="text-lg">{detail.name?.[0] ?? '?'}</AvatarFallback>
+                </Avatar>
               )}
               <div className="player-header-info">
                 <div className="player-detail-name">{detail.name}</div>
@@ -699,7 +722,7 @@ function TeamPanel({ side, selectedTeam, onTeamChange, teams, roster, loading, e
     <div className={`team-panel team-panel--${side}`}>
       <div className="panel-header">
         <div className="panel-header-title">
-          {teamLogo && <img className="team-logo" src={teamLogo} alt="" onError={e => { e.target.style.display = 'none' }} />}
+          {teamLogo && <img className="size-6 shrink-0 object-contain" src={teamLogo} alt="" onError={e => { e.target.style.display = 'none' }} />}
           <h2>{label}</h2>
         </div>
         <select
@@ -927,9 +950,9 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam, token
     <div className="matchup-analyzer">
       <h2 className="analyzer-title">Matchup Analyzer</h2>
       <p className="analyzer-subtitle">
-        {myTeamLogo && <img className="team-logo team-logo--inline" src={myTeamLogo} alt="" onError={e => { e.target.style.display = 'none' }} />}
+        {myTeamLogo && <img className="size-5 shrink-0 object-contain" src={myTeamLogo} alt="" onError={e => { e.target.style.display = 'none' }} />}
         {myTeam} vs {opponentTeam}
-        {oppTeamLogo && <img className="team-logo team-logo--inline" src={oppTeamLogo} alt="" onError={e => { e.target.style.display = 'none' }} />}
+        {oppTeamLogo && <img className="size-5 shrink-0 object-contain" src={oppTeamLogo} alt="" onError={e => { e.target.style.display = 'none' }} />}
       </p>
 
       <div className="matchup-edges-card">
@@ -1464,23 +1487,36 @@ function TeamRankings({ teams, teamsLoading }) {
 
       {!isLoading && (
         <div className="rankings-grid">
-          {rankings.map(cat => (
-            <div key={cat.key} className="ranking-category">
-              <div className="ranking-category-title">{cat.label}</div>
-              {cat.rows.map((t, i) => {
-                const logo = teams.find(team => team.teamName === t.name)?.logo
-                return (
-                  <div key={t.name} className="ranking-row">
-                    <span className="rank-num">{i + 1}</span>
-                    {logo && <img className="team-logo team-logo--inline" src={logo} alt="" onError={e => { e.target.style.display = 'none' }} />}
-                    <span className="rank-team">{t.name}</span>
-                    <span className="rank-val" style={{ color: getRatingColor(t.val) }}>{t.val}</span>
+          {rankings.map(cat => {
+            const max = cat.rows[0]?.val || 1
+            return (
+              <Card key={cat.key} className="gap-0">
+                <CardContent className="pt-4">
+                  <div className="mb-2 flex items-center justify-between border-b pb-2">
+                    <span className="font-mono text-[11px] font-bold tracking-widest text-muted-foreground uppercase">{cat.label}</span>
+                    <span className="font-mono text-[11px] font-bold tracking-widest text-muted-foreground uppercase">Avg ↓</span>
                   </div>
-                )
-              })}
-              {cat.rows.length === 0 && <p className="no-data">No data</p>}
-            </div>
-          ))}
+                  {cat.rows.map((t, i) => {
+                    const logo = teams.find(team => team.teamName === t.name)?.logo
+                    return (
+                      <div key={t.name} className="flex items-center gap-2.5 border-b py-2 last:border-b-0">
+                        <span className="w-5 shrink-0 text-right font-mono text-xs text-muted-foreground">{i + 1}</span>
+                        {logo
+                          ? <img className="size-6 shrink-0 object-contain" src={logo} alt="" onError={e => { e.target.style.visibility = 'hidden' }} />
+                          : <span className="size-6 shrink-0" />}
+                        <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{t.name.replace(/^All-Time /, '')}</span>
+                        <span className="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-muted sm:block">
+                          <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${Math.round((t.val / max) * 100)}%` }} />
+                        </span>
+                        <RatingChip value={t.val} />
+                      </div>
+                    )
+                  })}
+                  {cat.rows.length === 0 && <p className="no-data">No data</p>}
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       )}
     </div>

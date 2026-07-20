@@ -4,28 +4,28 @@
    App.jsx) — bind Tailwind's dark: variant to that attribute instead of a .dark class. */
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
-/* ── shadcn/ui design tokens (neutral base) ── */
+/* ── shadcn/ui design tokens (warm cream light theme, per the nba2kapi reference) ── */
 :root {
   --radius: 14px;
-  --background: oklch(0.985 0.004 95);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0.003 95);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.955 0.004 95);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.955 0.004 95);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.918 0.005 95);
-  --input: oklch(0.918 0.005 95);
-  --ring: oklch(0.708 0 0);
+  --background: #f6f3ea;
+  --foreground: #17160f;
+  --card: #ffffff;
+  --card-foreground: #17160f;
+  --popover: #ffffff;
+  --popover-foreground: #17160f;
+  --primary: #15140d;
+  --primary-foreground: #faf8f2;
+  --secondary: #efece0;
+  --secondary-foreground: #2a2820;
+  --muted: #eae6d8;
+  --muted-foreground: #77715f;
+  --accent: #efece0;
+  --accent-foreground: #2a2820;
+  --destructive: #dc2626;
+  --destructive-foreground: #faf8f2;
+  --border: #e5e0d0;
+  --input: #d9d2bd;
+  --ring: #a89f85;
 }
 
 [data-theme='dark'] {
