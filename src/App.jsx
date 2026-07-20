@@ -68,6 +68,177 @@ function getBadgeTierLabel(tier) {
 
 const PERIMETER = ['PG', 'SG', 'SF']
 const BIGS = ['C', 'PF']
+const ROTATION_SIZE = 8
+
+function isPerimeterPlayer(p) { return (p.positions || []).some(pos => PERIMETER.includes(pos)) }
+function isBigPlayer(p) { return (p.positions || []).some(pos => BIGS.includes(pos)) }
+function topByOverall(roster, n) {
+  return [...roster].filter(p => p.attributes).sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0)).slice(0, n)
+}
+
+// Fills PG/SG/SF/PF/C from a pool ranked by scoreFn, one player per slot, no repeats.
+function pickPositionalLineup(pool, scoreFn) {
+  const sorted = [...pool].sort((a, b) => scoreFn(b) - scoreFn(a))
+  const slots = ['PG', 'SG', 'SF', 'PF', 'C']
+  const used = new Set()
+  const result = []
+  for (const slot of slots) {
+    const match = sorted.find(p => !used.has(p.name) && (p.positions || []).includes(slot))
+    if (match) { used.add(match.name); result.push(match) }
+  }
+  for (const p of sorted) {
+    if (result.length >= 5) break
+    if (!used.has(p.name)) { used.add(p.name); result.push(p) }
+  }
+  return result
+}
+
+// Computes what `attackRoster` should do against `defendRoster`: attack targets on defendRoster,
+// attackRoster's own weak perimeter defenders to hide, defendRoster's poor shooters to leave open,
+// and attackRoster's perimeter speed edges. Calling this with (opponent, mine) instead of (mine, opponent)
+// yields the opponent's likely game plan against you, since the logic is fully symmetric.
+function computeScoutingReport(attackRoster, defendRoster, n = ROTATION_SIZE) {
+  const attackers = topByOverall(attackRoster, n)
+  const targets = topByOverall(defendRoster, n)
+
+  const attackTargets = targets
+    .map(p => {
+      const pos = p.positions || []
+      const isB = isBigPlayer(p)
+      const perim = p.attributes.perimeterDefense ?? 99
+      const interior = p.attributes.interiorDefense ?? 99
+      let attackHint
+      if (isB) {
+        attackHint = perim <= interior
+          ? 'stretch big — low PD means cannot guard on perimeter; use a shooter to pull them away from the paint'
+          : 'paint target — low interior defense; post up or attack the basket against them'
+      } else {
+        attackHint = 'ISO/drive target — low perimeter defense; blow past them on the wing or in isolation'
+      }
+      return { name: p.name, archetype: p.archetype, positions: pos, perim, interior, attackHint }
+    })
+    .sort((a, b) => (a.perim + a.interior) - (b.perim + b.interior))
+    .slice(0, 3)
+
+  const hideTargets = attackers
+    .filter(isPerimeterPlayer)
+    .map(p => ({ name: p.name, archetype: p.archetype, perim: p.attributes.perimeterDefense ?? 99 }))
+    .sort((a, b) => a.perim - b.perim)
+    .slice(0, 3)
+
+  const leaveOpen = targets
+    .filter(isPerimeterPlayer)
+    .map(p => ({
+      name: p.name,
+      archetype: p.archetype,
+      three: p.attributes.threePointShot ?? 99,
+      mid: p.attributes.midRangeShot ?? 99,
+    }))
+    .filter(p => p.three < 80)
+    .sort((a, b) => (a.three + a.mid) - (b.three + b.mid))
+    .slice(0, 3)
+
+  const speedAdvantage = attackers
+    .filter(isPerimeterPlayer)
+    .map(attackerP => {
+      const attackerPos = attackerP.positions || []
+      const targetMatch = targets
+        .filter(p => (p.positions || []).some(pos => attackerPos.includes(pos)))
+        .sort((a, b) => (a.attributes.speed ?? 0) - (b.attributes.speed ?? 0))[0]
+      if (!targetMatch) return null
+      const diff = (attackerP.attributes.speed ?? 0) - (targetMatch.attributes.speed ?? 0)
+      return diff >= 8 ? {
+        attackerPlayer: attackerP.name,
+        attackerSpeed: attackerP.attributes.speed,
+        targetPlayer: targetMatch.name,
+        targetSpeed: targetMatch.attributes.speed,
+        diff,
+      } : null
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.diff - a.diff)
+    .slice(0, 3)
+
+  return { attackTargets, hideTargets, leaveOpen, speedAdvantage }
+}
+
+// Best individual defenders across the FULL roster (not just the rotation) — a reference for
+// specialist matchups even when the player isn't a top-8 overall piece.
+function computeBestDefenders(roster) {
+  const withAttrs = roster.filter(p => p.attributes)
+
+  const lockdownPerimeter = withAttrs
+    .filter(isPerimeterPlayer)
+    .map(p => ({
+      name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions,
+      perim: p.attributes.perimeterDefense ?? 0, steal: p.attributes.steal ?? 0,
+      score: (p.attributes.perimeterDefense ?? 0) + (p.attributes.steal ?? 0) * 0.3,
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+
+  const paintDefenders = withAttrs
+    .filter(isBigPlayer)
+    .map(p => ({
+      name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions,
+      interior: p.attributes.interiorDefense ?? 0, block: p.attributes.block ?? 0,
+      score: (p.attributes.interiorDefense ?? 0) + (p.attributes.block ?? 0) * 0.3,
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+
+  return { lockdownPerimeter, paintDefenders }
+}
+
+// Recommends ball-screen coverage for myRoster's top bigs against oppRoster's most dangerous
+// ball-handler, reasoning from rim protection, mobility, and the handler's pull-up/pass threat.
+function computePnRGuidance(myRoster, oppRoster) {
+  const withAttrs = r => r.filter(p => p.attributes)
+  const myBigs = withAttrs(myRoster)
+    .filter(isBigPlayer)
+    .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
+    .slice(0, 2)
+
+  const ballHandlers = withAttrs(oppRoster)
+    .filter(p => (p.positions || []).some(pos => ['PG', 'SG'].includes(pos)))
+    .map(p => ({
+      ...p,
+      handleScore: (p.attributes.ballHandle ?? 0) * 0.4 + (p.attributes.speed ?? 0) * 0.3 + (p.attributes.acceleration ?? 0) * 0.3,
+    }))
+    .sort((a, b) => b.handleScore - a.handleScore)
+
+  if (!myBigs.length || !ballHandlers.length) return []
+
+  const primaryHandler = ballHandlers[0]
+  const pullUpThreat = Math.max(primaryHandler.attributes.threePointShot ?? 0, primaryHandler.attributes.midRangeShot ?? 0)
+  const passNote = (primaryHandler.attributes.passAccuracy ?? 0) >= 85
+    ? ` Watch the short roll — ${primaryHandler.name} passes at a ${primaryHandler.attributes.passAccuracy} rating.`
+    : ''
+
+  return myBigs.map(big => {
+    const rimProtection = ((big.attributes.interiorDefense ?? 0) + (big.attributes.block ?? 0)) / 2
+    const mobility = ((big.attributes.speed ?? 0) + (big.attributes.acceleration ?? 0)) / 2
+
+    let coverage, reason
+    if (pullUpThreat >= 85) {
+      coverage = mobility >= 70 ? 'Hard Hedge' : 'Switch'
+      reason = mobility >= 70
+        ? `${primaryHandler.name} is a lethal pull-up shooter (${pullUpThreat} rated) — hedge hard with ${big.name} to force the ball out of his hands before he can rise into a jumper.`
+        : `${primaryHandler.name} is a lethal pull-up shooter (${pullUpThreat} rated) and ${big.name} isn't mobile enough to hedge and recover — switch to take away the jumper entirely.`
+    } else if (rimProtection >= 80) {
+      coverage = 'Drop'
+      reason = `${big.name} protects the rim (Int. Def/Block avg ${Math.round(rimProtection)}) and ${primaryHandler.name} isn't a real shooting threat (${pullUpThreat} rated) — drop and dare the pull-up.`
+    } else if (mobility >= 75) {
+      coverage = 'Soft Hedge'
+      reason = `${big.name} has the mobility (avg ${Math.round(mobility)}) to hedge and recover without opening an easy roll.`
+    } else {
+      coverage = 'Go Under'
+      reason = `${big.name} lacks rim protection and mobility — keep the guard going under the screen rather than put ${big.name} in space.`
+    }
+
+    return { big: big.name, handler: primaryHandler.name, coverage, reason: reason + passNote }
+  })
+}
 
 function computeMatchupEdges(myRoster, oppRoster) {
   const PERIM = ['PG', 'SG', 'SF']
@@ -334,76 +505,19 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
   const [activeTab, setActiveTab] = useState('scouting')
   const [opponentStrategy, setOpponentStrategy] = useState('')
 
-  const isPerimeter = p => (p.positions || []).some(pos => PERIMETER.includes(pos))
-  const isBig = p => (p.positions || []).some(pos => BIGS.includes(pos))
+  // Starting five (5v5) is used only for on-court assignments — bestMatchups can't put more
+  // than 5 defenders on the floor. Everything else scouts the full rotation (top 8 by overall)
+  // so bench pieces a good opponent will actually play show up too.
+  const myStartingFive = topByOverall(myRoster, 5)
+  const oppStartingFive = topByOverall(opponentRoster, 5)
+  const myRotation = topByOverall(myRoster, ROTATION_SIZE)
+  const oppRotation = topByOverall(opponentRoster, ROTATION_SIZE)
 
-  const topN = (roster, n = 5) => [...roster]
-    .filter(p => p.attributes)
-    .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
-    .slice(0, n)
+  const myReport = computeScoutingReport(myRoster, opponentRoster)
+  const theirReport = computeScoutingReport(opponentRoster, myRoster)
+  const { attackTargets, hideTargets, leaveOpen, speedAdvantage } = myReport
 
-  const myStarters = topN(myRoster)
-  const oppStarters = topN(opponentRoster)
-
-  const attackTargets = oppStarters
-    .map(p => {
-      const pos = p.positions || []
-      const isB = pos.some(pp => BIGS.includes(pp))
-      const perim = p.attributes.perimeterDefense ?? 99
-      const interior = p.attributes.interiorDefense ?? 99
-      let attackHint
-      if (isB) {
-        attackHint = perim <= interior
-          ? 'stretch big — low PD means cannot guard on perimeter; use a shooter to pull them away from the paint'
-          : 'paint target — low interior defense; post up or attack the basket against them'
-      } else {
-        attackHint = 'ISO/drive target — low perimeter defense; blow past them on the wing or in isolation'
-      }
-      return { name: p.name, archetype: p.archetype, positions: pos, perim, interior, attackHint }
-    })
-    .sort((a, b) => (a.perim + a.interior) - (b.perim + b.interior))
-    .slice(0, 3)
-
-  const hideTargets = myStarters
-    .filter(p => isPerimeter(p))
-    .map(p => ({ name: p.name, archetype: p.archetype, perim: p.attributes.perimeterDefense ?? 99 }))
-    .sort((a, b) => a.perim - b.perim)
-    .slice(0, 3)
-
-  const leaveOpen = oppStarters
-    .filter(p => isPerimeter(p))
-    .map(p => ({
-      name: p.name,
-      archetype: p.archetype,
-      three: p.attributes.threePointShot ?? 99,
-      mid: p.attributes.midRangeShot ?? 99,
-    }))
-    .filter(p => p.three < 80)
-    .sort((a, b) => (a.three + a.mid) - (b.three + b.mid))
-    .slice(0, 3)
-
-  const speedAdvantage = myStarters
-    .filter(p => isPerimeter(p))
-    .map(myP => {
-      const oppPos = myP.positions || []
-      const oppMatch = oppStarters
-        .filter(p => (p.positions || []).some(pos => oppPos.includes(pos)))
-        .sort((a, b) => (a.attributes.speed ?? 0) - (b.attributes.speed ?? 0))[0]
-      if (!oppMatch) return null
-      const diff = (myP.attributes.speed ?? 0) - (oppMatch.attributes.speed ?? 0)
-      return diff >= 8 ? {
-        myPlayer: myP.name,
-        mySpeed: myP.attributes.speed,
-        oppPlayer: oppMatch.name,
-        oppSpeed: oppMatch.attributes.speed,
-        diff,
-      } : null
-    })
-    .filter(Boolean)
-    .sort((a, b) => b.diff - a.diff)
-    .slice(0, 3)
-
-  const clutchPlayers = myStarters
+  const clutchPlayers = myRotation
     .map(p => ({
       name: p.name,
       overall: p.overall,
@@ -416,31 +530,28 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
     .slice(0, 3)
 
   const HOF_TIERS = ['legendary', 'hall of fame', 'gold']
-  const myTopPlayers = [...myRoster]
-    .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
-    .slice(0, 5)
-    .map(p => ({
-      name: p.name,
-      overall: p.overall,
-      badges: dedupeByName(p.badges?.list).filter(b =>
-        HOF_TIERS.some(t => (b.tier || '').toLowerCase().includes(t))
-      ),
-    }))
+  const myTopPlayers = myRotation.map(p => ({
+    name: p.name,
+    overall: p.overall,
+    badges: dedupeByName(p.badges?.list).filter(b =>
+      HOF_TIERS.some(t => (b.tier || '').toLowerCase().includes(t))
+    ),
+  }))
 
   const bestMatchups = (() => {
-    const threats = oppStarters
+    const threats = oppStartingFive
     const usedDefenders = new Set()
     return threats.map(threat => {
       const oppPos = threat.positions || []
-      const isBig = oppPos.some(p => BIGS.includes(p))
+      const isBig = isBigPlayer(threat)
       // Stretch bigs (PF/C with 3PT ≥ 78) need a perimeter defender, not a shot blocker
       const isStretchBig = isBig && (threat.attributes?.threePointShot ?? 0) >= 78
       const big = isBig && !isStretchBig
       const defStat = big ? 'interiorDefense' : 'perimeterDefense'
       const statLabel = big ? 'Interior Defense' : 'Perimeter Defense'
 
-      const samePos = myStarters.filter(p => !usedDefenders.has(p.name) && (p.positions || []).some(pos => oppPos.includes(pos)))
-      const pool = samePos.length > 0 ? samePos : myStarters.filter(p => !usedDefenders.has(p.name))
+      const samePos = myStartingFive.filter(p => !usedDefenders.has(p.name) && (p.positions || []).some(pos => oppPos.includes(pos)))
+      const pool = samePos.length > 0 ? samePos : myStartingFive.filter(p => !usedDefenders.has(p.name))
       const defender = [...pool].sort((a, b) => (b.attributes[defStat] ?? 0) - (a.attributes[defStat] ?? 0))[0]
       if (defender) usedDefenders.add(defender.name)
 
@@ -456,6 +567,9 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
     }).filter(Boolean)
   })()
 
+  const bestDefenders = computeBestDefenders(myRoster)
+  const pnrGuidance = computePnRGuidance(myRoster, opponentRoster)
+
   async function getAIGamePlan() {
     setPlanLoading(true)
     setPlanError(null)
@@ -467,15 +581,20 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
         .slice(0, 5)
         .map(b => `${b.name} (${getBadgeTierLabel(b.tier)})`)
 
-      const myKeyPlayers = [...myRoster]
-        .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
-        .slice(0, 5)
-        .map(p => ({ name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions, badges: topBadges(p) }))
+      const myKeyPlayers = myRotation.map(p => ({ name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions, badges: topBadges(p) }))
+      const oppKeyPlayers = oppRotation.map(p => ({ name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions, badges: topBadges(p) }))
 
-      const oppKeyPlayers = [...opponentRoster]
-        .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
-        .slice(0, 5)
-        .map(p => ({ name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions, badges: topBadges(p) }))
+      const speedAdvantagePayload = speedAdvantage.map(m => ({
+        myPlayer: m.attackerPlayer, mySpeed: m.attackerSpeed, oppPlayer: m.targetPlayer, oppSpeed: m.targetSpeed, diff: m.diff,
+      }))
+      const theirSpeedAdvantage = theirReport.speedAdvantage.map(m => ({
+        theirPlayer: m.attackerPlayer, theirSpeed: m.attackerSpeed, myPlayer: m.targetPlayer, mySpeed: m.targetSpeed, diff: m.diff,
+      }))
+
+      const topDefenders = {
+        lockdownPerimeter: bestDefenders.lockdownPerimeter.slice(0, 2).map(p => ({ name: p.name, perim: p.perim })),
+        paintDefenders: bestDefenders.paintDefenders.slice(0, 2).map(p => ({ name: p.name, interior: p.interior })),
+      }
 
       const res = await fetch(GAMEPLAN_URL, {
         method: 'POST',
@@ -483,8 +602,14 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
         body: JSON.stringify({
           myTeam, opponentTeam,
           attackTargets, hideTargets, leaveOpen,
-          speedAdvantage, bestMatchups,
+          speedAdvantage: speedAdvantagePayload, bestMatchups,
           myKeyPlayers, oppKeyPlayers,
+          pnrGuidance,
+          theirAttackTargets: theirReport.attackTargets,
+          theirHideTargets: theirReport.hideTargets,
+          myPlayersLeftOpen: theirReport.leaveOpen,
+          theirSpeedAdvantage,
+          topDefenders,
           opponentStrategy: opponentStrategy.trim(),
         }),
       })
@@ -501,61 +626,33 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
 
   // Lineup combinations
   const withAttrs = myRoster.filter(p => p.attributes)
-  const isBigP = p => (p.positions || []).some(pos => BIGS.includes(pos))
+  const isBigP = isBigPlayer
 
-  const closingLineup = [...withAttrs]
-    .sort((a, b) => ((b.attributes.shotIQ??0) + (b.attributes.offensiveConsistency??0) + (b.overall??0)*0.5) -
-                    ((a.attributes.shotIQ??0) + (a.attributes.offensiveConsistency??0) + (a.overall??0)*0.5))
-    .slice(0, 5)
+  const bestOverallLineup = pickPositionalLineup(withAttrs, p => p.overall ?? 0)
 
-  const paceLineup = [...withAttrs]
-    .sort((a, b) => ((b.attributes.speed??0) + (b.attributes.threePointShot??0)*1.2) -
-                    ((a.attributes.speed??0) + (a.attributes.threePointShot??0)*1.2))
-    .slice(0, 5)
-
-  const lockdownLineup = [...withAttrs]
+  const bestDefensiveLineup = [...withAttrs]
     .sort((a, b) => ((b.attributes.perimeterDefense??0) + (b.attributes.interiorDefense??0) + (b.attributes.steal??0) + (b.attributes.block??0)) -
                     ((a.attributes.perimeterDefense??0) + (a.attributes.interiorDefense??0) + (a.attributes.steal??0) + (a.attributes.block??0)))
     .slice(0, 5)
 
-  const bigPool = [...withAttrs].filter(isBigP).sort((a, b) => (b.overall??0) - (a.overall??0)).slice(0, 2)
-  const bigNames = new Set(bigPool.map(p => p.name))
-  const twinTowersLineup = [...bigPool, ...[...withAttrs].filter(p => !bigNames.has(p.name)).sort((a, b) => (b.overall??0) - (a.overall??0)).slice(0, 3)]
-
-  const shooterLineup = (() => {
-    const sorted = [...withAttrs].sort((a, b) => (b.attributes.threePointShot ?? 0) - (a.attributes.threePointShot ?? 0))
-    const slots = ['PG', 'SG', 'SF', 'PF', 'C']
-    const used = new Set()
-    const result = []
-    for (const slot of slots) {
-      const match = sorted.find(p => !used.has(p.name) && (p.positions || []).includes(slot))
-      if (match) { used.add(match.name); result.push(match) }
-    }
-    // fill any remaining slots from the sorted pool
-    for (const p of sorted) {
-      if (result.length >= 5) break
-      if (!used.has(p.name)) { used.add(p.name); result.push(p) }
-    }
-    return result
-  })()
+  const best3ptLineup = pickPositionalLineup(withAttrs, p => p.attributes.threePointShot ?? 0)
 
   const lineups = [
-    { name: 'Closing Lineup', desc: 'High-IQ players for tight fourth-quarter situations', players: closingLineup,
-      getStat: p => ({ label: 'Shot IQ', val: p.attributes.shotIQ ?? '—' }) },
-    { name: 'Pace & Space', desc: 'Push tempo and stretch the floor with speed and shooting', players: paceLineup,
-      getStat: p => ({ label: 'Speed', val: p.attributes.speed ?? '—' }) },
-    { name: 'Sharpshooters', desc: 'Best 3PT shooters to space the floor and punish close-outs', players: shooterLineup,
-      getStat: p => ({ label: '3PT', val: p.attributes.threePointShot ?? '—' }) },
-    { name: 'Lockdown', desc: 'Maximum defensive pressure across all positions', players: lockdownLineup,
+    { name: 'Best Overall Lineup', desc: 'Highest-rated five available, positionally balanced', players: bestOverallLineup,
+      getStat: p => ({ label: 'OVR', val: p.overall ?? '—' }) },
+    { name: 'Best Defensive Lineup', desc: 'Maximum defensive pressure across all positions', players: bestDefensiveLineup,
       getStat: p => ({ label: isBigP(p) ? 'Int. Def' : 'Per. Def', val: (isBigP(p) ? p.attributes.interiorDefense : p.attributes.perimeterDefense) ?? '—' }) },
-    { name: 'Twin Towers', desc: 'Two bigs for interior dominance and paint presence', players: twinTowersLineup,
-      getStat: p => ({ label: isBigP(p) ? 'Int. Def' : 'Speed', val: (isBigP(p) ? p.attributes.interiorDefense : p.attributes.speed) ?? '—' }) },
+    { name: 'Best 3PT Lineup', desc: 'Best 3PT shooters to space the floor and punish close-outs', players: best3ptLineup,
+      getStat: p => ({ label: '3PT', val: p.attributes.threePointShot ?? '—' }) },
   ]
 
   const edges = computeMatchupEdges(myRoster, opponentRoster)
   const TABS = [
     { id: 'scouting', label: 'Scouting' },
+    { id: 'best', label: 'Best Defenders' },
     { id: 'matchups', label: 'Matchups' },
+    { id: 'pnr', label: 'Pick & Roll' },
+    { id: 'theirplan', label: 'Their Game Plan' },
     { id: 'lineups', label: 'Lineups' },
     { id: 'ai-plan', label: 'AI Plan' },
   ]
@@ -650,13 +747,13 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
               <div key={i} className="analysis-row">
                 <div className="matchup-pair">
                   <span className="matchup-threat">
-                    {m.myPlayer}
-                    <span style={{ color: getRatingColor(m.mySpeed), marginLeft: 6, fontSize: 12 }}>Speed {m.mySpeed}</span>
+                    {m.attackerPlayer}
+                    <span style={{ color: getRatingColor(m.attackerSpeed), marginLeft: 6, fontSize: 12 }}>Speed {m.attackerSpeed}</span>
                   </span>
                   <span className="matchup-arrow">vs</span>
                   <span className="matchup-defender">
-                    {m.oppPlayer}
-                    <span style={{ color: getRatingColor(m.oppSpeed), marginLeft: 6, fontSize: 12 }}>Speed {m.oppSpeed}</span>
+                    {m.targetPlayer}
+                    <span style={{ color: getRatingColor(m.targetSpeed), marginLeft: 6, fontSize: 12 }}>Speed {m.targetSpeed}</span>
                   </span>
                 </div>
               </div>
@@ -673,6 +770,42 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
                   <span style={{ color: getRatingColor(p.shotIQ) }}>Shot IQ {p.shotIQ}</span>
                   {' / '}
                   <span style={{ color: getRatingColor(p.offCon) }}>Off. Con {p.offCon}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'best' && (
+        <div className="analysis-grid">
+          <div className="analysis-card">
+            <div className="analysis-card-title">Best Lockdown Perimeter Defenders</div>
+            <p className="analysis-hint">Full {myTeam} roster — top options to guard elite wings/guards</p>
+            {bestDefenders.lockdownPerimeter.length === 0 && <p className="no-data">Insufficient data</p>}
+            {bestDefenders.lockdownPerimeter.map((p, i) => (
+              <div key={i} className="analysis-row">
+                <span className="analysis-name">{p.name}</span>
+                <span className="analysis-stats">
+                  <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
+                  {' / '}
+                  <span style={{ color: getRatingColor(p.steal) }}>Steal {p.steal}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="analysis-card">
+            <div className="analysis-card-title">Best Paint Defenders</div>
+            <p className="analysis-hint">Full {myTeam} roster — top rim-protection options</p>
+            {bestDefenders.paintDefenders.length === 0 && <p className="no-data">Insufficient data</p>}
+            {bestDefenders.paintDefenders.map((p, i) => (
+              <div key={i} className="analysis-row">
+                <span className="analysis-name">{p.name}</span>
+                <span className="analysis-stats">
+                  <span style={{ color: getRatingColor(p.interior) }}>Int. Def {p.interior}</span>
+                  {' / '}
+                  <span style={{ color: getRatingColor(p.block) }}>Block {p.block}</span>
                 </span>
               </div>
             ))}
@@ -722,6 +855,99 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
                 ) : (
                   <span className="no-data">No Legendary/HoF/Gold badges</span>
                 )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'pnr' && (
+        <div className="analysis-grid">
+          <div className="analysis-card analysis-card--matchups">
+            <div className="analysis-card-title">Pick-and-Roll Coverage</div>
+            <p className="analysis-hint">
+              {pnrGuidance.length > 0
+                ? `Recommended coverage for your bigs vs ${opponentTeam}'s top ball-handler, ${pnrGuidance[0].handler}`
+                : 'Insufficient data for pick-and-roll coverage'}
+            </p>
+            {pnrGuidance.map((g, i) => (
+              <div key={i} className="pnr-row">
+                <div className="pnr-row-header">
+                  <span className="pnr-big">{g.big}</span>
+                  <span className="pnr-coverage-tag">{g.coverage}</span>
+                </div>
+                <p className="pnr-reason">{g.reason}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'theirplan' && (
+        <div className="analysis-grid">
+          <div className="analysis-card">
+            <div className="analysis-card-title">What They'll Attack</div>
+            <p className="analysis-hint">Weak links on {myTeam} they'll target</p>
+            {theirReport.attackTargets.length === 0 && <p className="no-data">Insufficient data</p>}
+            {theirReport.attackTargets.map((p, i) => (
+              <div key={i} className="analysis-row">
+                <span className="analysis-name">{p.name}</span>
+                <span className="analysis-stats">
+                  <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
+                  {' / '}
+                  <span style={{ color: getRatingColor(p.interior) }}>Int. Def {p.interior}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="analysis-card">
+            <div className="analysis-card-title">Defenders They'll Hide</div>
+            <p className="analysis-hint">{opponentTeam}'s weak perimeter defenders — hunt these matchups</p>
+            {theirReport.hideTargets.length === 0 && <p className="no-data">Insufficient data</p>}
+            {theirReport.hideTargets.map((p, i) => (
+              <div key={i} className="analysis-row">
+                <span className="analysis-name">{p.name}</span>
+                <span className="analysis-stats">
+                  <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="analysis-card">
+            <div className="analysis-card-title">Your Players They'll Leave Open</div>
+            <p className="analysis-hint">Poor shooters on {myTeam} — they'll sag off to help</p>
+            {theirReport.leaveOpen.length === 0 && <p className="no-data">Insufficient data</p>}
+            {theirReport.leaveOpen.map((p, i) => (
+              <div key={i} className="analysis-row">
+                <span className="analysis-name">{p.name}</span>
+                <span className="analysis-stats">
+                  <span style={{ color: getRatingColor(p.three) }}>Three-Point {p.three}</span>
+                  {' / '}
+                  <span style={{ color: getRatingColor(p.mid) }}>Mid-Range {p.mid}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="analysis-card">
+            <div className="analysis-card-title">Their Speed Advantage</div>
+            <p className="analysis-hint">Where they'll try to blow by you</p>
+            {theirReport.speedAdvantage.length === 0 && <p className="no-data">No major speed mismatches</p>}
+            {theirReport.speedAdvantage.map((m, i) => (
+              <div key={i} className="analysis-row">
+                <div className="matchup-pair">
+                  <span className="matchup-threat">
+                    {m.attackerPlayer}
+                    <span style={{ color: getRatingColor(m.attackerSpeed), marginLeft: 6, fontSize: 12 }}>Speed {m.attackerSpeed}</span>
+                  </span>
+                  <span className="matchup-arrow">vs</span>
+                  <span className="matchup-defender">
+                    {m.targetPlayer}
+                    <span style={{ color: getRatingColor(m.targetSpeed), marginLeft: 6, fontSize: 12 }}>Speed {m.targetSpeed}</span>
+                  </span>
+                </div>
               </div>
             ))}
           </div>
