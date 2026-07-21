@@ -1,58 +1,148 @@
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+@import "tailwindcss";
 
-/* ── Theme tokens — light is the default ── */
+/* The app toggles dark mode via document.documentElement.dataset.theme (see useTheme in
+   App.jsx) — bind Tailwind's dark: variant to that attribute instead of a .dark class. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* ── shadcn/ui design tokens (warm cream light theme, per the nba2kapi reference) ── */
 :root {
-  --bg: #eef1f6;
-  --surface: #ffffff;
-  --surface-2: #f7f9fc;
-  --surface-3: #eef2f8;
-  --border: #e3e8ef;
-  --border-strong: #cbd5e1;
-  --border-faint: #eef1f6;
-  --text: #16202c;
-  --text-2: #334155;
-  --text-muted: #64748b;
-  --text-faint: #94a3b8;
-  --accent: #2563eb;
-  --accent-soft: #dbeafe;
-  --error: #dc2626;
-  --error-bg: #fef2f2;
-  --error-border: #fecaca;
-  --rank-gold: #d97706;
-  --rank-bronze: #b45309;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 4px 16px rgba(16, 24, 40, 0.06);
-  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --radius: 14px;
+  --background: #f1efe8;
+  --foreground: #1a1918;
+  --card: #faf9f5;
+  --card-foreground: #1a1918;
+  --popover: #faf9f5;
+  --popover-foreground: #1a1918;
+  --primary: #1a1918;
+  --primary-foreground: #faf9f5;
+  --secondary: #f4f1ea;
+  --secondary-foreground: #57534a;
+  --muted: #efece4;
+  --muted-foreground: #8a8577;
+  --accent: #efece4;
+  --accent-foreground: #1a1918;
+  --destructive: #b3403d;
+  --destructive-foreground: #faf9f5;
+  --border: #e5e2da;
+  --input: #d9d4c7;
+  --ring: #b5b0a1;
+  --rating-strong: #1a1918;
+  --rating-mid: #57534a;
+  --rating-weak: #8a8577;
 }
 
 [data-theme='dark'] {
-  --bg: #0d0f14;
-  --surface: #111827;
-  --surface-2: #0f172a;
-  --surface-3: #1a2235;
-  --border: #1e2330;
-  --border-strong: #2d3748;
-  --border-faint: #0f1929;
-  --text: #f1f5f9;
-  --text-2: #e2e8f0;
-  --text-muted: #64748b;
-  --text-faint: #94a3b8;
-  --accent: #3b82f6;
-  --accent-soft: #1e3a8a;
-  --error: #ef4444;
-  --error-bg: #1f0d0d;
-  --error-border: #7f1d1d;
-  --rank-gold: #f59e0b;
-  --rank-bronze: #b45309;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.4);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --rating-strong: oklch(0.985 0 0);
+  --rating-mid: oklch(0.8 0 0);
+  --rating-weak: oklch(0.6 0 0);
 }
 
+@theme inline {
+  --font-sans: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+/* ── Legacy variable bridge ──
+   App.css (the pre-shadcn styles still covering the data-dense views) reads the old
+   token names. Alias them onto the shadcn palette so everything shares one theme while
+   components migrate to Tailwind/shadcn incrementally. Remove aliases as their last
+   consumers are ported. */
+:root, [data-theme='dark'] {
+  --bg: var(--background);
+  --surface: var(--card);
+  --surface-2: var(--secondary);
+  --surface-3: var(--muted);
+  --border-strong: var(--input);
+  --border-faint: var(--secondary);
+  --text: var(--foreground);
+  --text-2: var(--card-foreground);
+  --text-muted: var(--muted-foreground);
+  --text-faint: var(--muted-foreground);
+  --accent-soft: var(--accent);
+  --error: var(--destructive);
+  --error-bg: color-mix(in oklab, var(--destructive) 10%, var(--background));
+  --error-border: color-mix(in oklab, var(--destructive) 30%, var(--background));
+  --rank-gold: #b45309;
+  --rank-bronze: #92561f;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.06);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05);
+  --shadow-lift: 0 12px 32px rgb(0 0 0 / 0.12);
+  --radius-full: 999px;
+  --glass-bg: color-mix(in oklab, var(--card) 72%, transparent);
+  --glass-border: var(--border);
+  --skeleton-base: var(--muted);
+  --skeleton-shine: var(--secondary);
+}
 body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
   font-size: 14px;
+  font-weight: 500;
   line-height: 1.5;
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+    outline-color: color-mix(in oklab, var(--color-ring) 50%, transparent);
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

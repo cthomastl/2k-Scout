@@ -1,4 +1,25 @@
 import { useState, useEffect } from 'react'
+import {
+  LayoutDashboard, Search, BarChart3, Settings as SettingsIcon, LogOut, Sun, Moon,
+  Users, Target, Zap, ArrowRight, History as HistoryIcon, Loader2,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardHeader, CardTitle, CardDescription, CardAction, CardContent, CardFooter } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Progress } from '@/components/ui/progress'
+import { Separator } from '@/components/ui/separator'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 import './App.css'
 
 const API_KEY = import.meta.env.VITE_NBA2K_API_KEY ?? ''
@@ -19,43 +40,51 @@ async function apiFetch(path) {
   return res.json()
 }
 
-/* ── Icons (inline SVG — no emoji) ── */
-const Icon = ({ path, size = 18, stroke = 1.7, fill = 'none' }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke="currentColor"
-    strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    {path}
-  </svg>
-)
-const IconDashboard = p => <Icon {...p} path={<><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></>} />
-const IconScout = p => <Icon {...p} path={<><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></>} />
-const IconRankings = p => <Icon {...p} path={<><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></>} />
-const IconSettings = p => <Icon {...p} path={<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>} />
-const IconLogout = p => <Icon {...p} path={<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></>} />
-const IconSun = p => <Icon {...p} path={<><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>} />
-const IconMoon = p => <Icon {...p} path={<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>} />
-const IconUsers = p => <Icon {...p} path={<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></>} />
-const IconTarget = p => <Icon {...p} path={<><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></>} />
-const IconBolt = p => <Icon {...p} path={<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>} />
-const IconShield = p => <Icon {...p} path={<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>} />
-const IconArrowRight = p => <Icon {...p} path={<><path d="M5 12h14M12 5l7 7-7 7"/></>} />
+/* ── Icons (lucide-react, wrapped to keep the app's historical 18px default) ── */
+const IconDashboard = p => <LayoutDashboard size={18} strokeWidth={1.7} {...p} />
+const IconScout = p => <Search size={18} strokeWidth={1.7} {...p} />
+const IconRankings = p => <BarChart3 size={18} strokeWidth={1.7} {...p} />
+const IconSettings = p => <SettingsIcon size={18} strokeWidth={1.7} {...p} />
+const IconLogout = p => <LogOut size={18} strokeWidth={1.7} {...p} />
+const IconSun = p => <Sun size={18} strokeWidth={1.7} {...p} />
+const IconMoon = p => <Moon size={18} strokeWidth={1.7} {...p} />
+const IconUsers = p => <Users size={18} strokeWidth={1.7} {...p} />
+const IconTarget = p => <Target size={18} strokeWidth={1.7} {...p} />
+const IconBolt = p => <Zap size={18} strokeWidth={1.7} {...p} />
+const IconArrowRight = p => <ArrowRight size={18} strokeWidth={1.7} {...p} />
+const IconHistory = p => <HistoryIcon size={18} strokeWidth={1.7} {...p} />
 
+// Monochrome emphasis ramp (per the reference design): elite ratings read near-black,
+// weak ones fade out — information without the traffic-light color noise.
 function getRatingColor(val) {
   const n = parseInt(val, 10)
-  if (isNaN(n)) return '#9ca3af'
-  if (n >= 90) return '#22c55e'
-  if (n >= 75) return '#eab308'
-  return '#ef4444'
+  if (isNaN(n)) return 'var(--muted-foreground)'
+  if (n >= 90) return 'var(--rating-strong)'
+  if (n >= 75) return 'var(--rating-mid)'
+  return 'var(--rating-weak)'
 }
 
-function getBadgeTierColor(tier) {
-  if (!tier) return '#9ca3af'
-  const t = tier.toLowerCase()
-  if (t === 'legendary') return '#a855f7'
-  if (t === 'hall of fame' || t === 'hof') return '#f59e0b'
-  if (t === 'gold') return '#eab308'
-  if (t === 'silver') return '#94a3b8'
-  if (t === 'bronze') return '#b45309'
-  return '#9ca3af'
+// 2K card-tier chip colors (Galaxy Opal → Pink Diamond → Diamond → Amethyst → base),
+// matching the rating pills on the nba2kapi reference design.
+function ratingChipStyle(val) {
+  const n = parseInt(val, 10)
+  if (isNaN(n)) return { background: '#e5e2da', color: '#57534a' }
+  if (n >= 95) return { background: '#1a1918', color: '#faf9f5' }
+  if (n >= 90) return { background: '#b79ce0', color: '#1a1918' }
+  if (n >= 85) return { background: '#d9bd7c', color: '#1a1918' }
+  return { background: '#e5e2da', color: '#57534a' }
+}
+
+function RatingChip({ value, className }) {
+  if (value == null || value === '—') return null
+  return (
+    <span
+      className={cn('inline-flex min-w-8 items-center justify-center rounded-md px-1.5 py-0.5 font-mono text-xs font-bold', className)}
+      style={ratingChipStyle(value)}
+    >
+      {value}
+    </span>
+  )
 }
 
 function getBadgeTierLabel(tier) {
@@ -68,6 +97,386 @@ function getBadgeTierLabel(tier) {
 
 const PERIMETER = ['PG', 'SG', 'SF']
 const BIGS = ['C', 'PF']
+const ROTATION_SIZE = 8
+
+function isPerimeterPlayer(p) { return (p.positions || []).some(pos => PERIMETER.includes(pos)) }
+function isBigPlayer(p) { return (p.positions || []).some(pos => BIGS.includes(pos)) }
+function topByOverall(roster, n) {
+  return [...roster].filter(p => p.attributes).sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0)).slice(0, n)
+}
+
+// Fills PG/SG/SF/PF/C from a pool ranked by scoreFn, one player per slot, no repeats.
+function pickPositionalLineup(pool, scoreFn) {
+  const sorted = [...pool].sort((a, b) => scoreFn(b) - scoreFn(a))
+  const slots = ['PG', 'SG', 'SF', 'PF', 'C']
+  const used = new Set()
+  const result = []
+  for (const slot of slots) {
+    const match = sorted.find(p => !used.has(p.name) && (p.positions || []).includes(slot))
+    if (match) { used.add(match.name); result.push(match) }
+  }
+  for (const p of sorted) {
+    if (result.length >= 5) break
+    if (!used.has(p.name)) { used.add(p.name); result.push(p) }
+  }
+  return result
+}
+
+// A raw Perimeter/Interior Defense number doesn't tell the whole story — a player with a mediocre
+// rating but Clamps/Glove/Pick Dodger at Gold+ can still lock up a quick guard, while a "weak"
+// number with no badges is a genuine target. These catalogs + the score/chip helpers below let
+// every defense-rating-driven computation (attack targets, hide targets, best defenders) account
+// for badges instead of the raw number alone.
+const PERIMETER_DEFENSE_BADGES = [
+  'clamps', 'glove', 'interceptor', 'pick dodger', 'chase down artist',
+  'ankle braces', 'off-ball pest', 'challenger', 'high-flying denier', 'intimidator',
+]
+const PAINT_DEFENSE_BADGES = [
+  'rim protector', 'paint patroller', 'post lockdown', 'brick wall',
+  'boxout beast', 'rebound chaser', 'high-flying denier', 'intimidator',
+]
+const BADGE_TIER_WEIGHT = { legendary: 5, 'hall of fame': 4, hof: 4, gold: 3, silver: 2, bronze: 1 }
+function badgeTierWeight(tier) { return BADGE_TIER_WEIGHT[(tier || '').toLowerCase()] ?? 0 }
+
+function matchedDefensiveBadges(player, badgeCatalog) {
+  return dedupeByName(player.badges?.list ?? [])
+    .filter(b => badgeCatalog.includes((b.name || '').toLowerCase()))
+    .sort((a, b) => badgeTierWeight(b.tier) - badgeTierWeight(a.tier))
+}
+
+// Points added to a raw defense rating per matched badge, scaled so a single Gold badge (≈15pts)
+// or HOF (≈20pts) meaningfully moves a player up the list — comparable to a real attribute edge.
+function defensiveBadgeScore(player, badgeCatalog) {
+  return matchedDefensiveBadges(player, badgeCatalog).reduce((sum, b) => sum + badgeTierWeight(b.tier) * 5, 0)
+}
+
+// Computes what `attackRoster` should do against `defendRoster`: attack targets on defendRoster,
+// attackRoster's own weak perimeter defenders to hide, defendRoster's poor shooters to leave open,
+// and attackRoster's perimeter speed edges. Calling this with (opponent, mine) instead of (mine, opponent)
+// yields the opponent's likely game plan against you, since the logic is fully symmetric.
+function computeScoutingReport(attackRoster, defendRoster, n = ROTATION_SIZE) {
+  const attackers = topByOverall(attackRoster, n)
+  const targets = topByOverall(defendRoster, n)
+
+  const attackTargets = targets
+    .map(p => {
+      const pos = p.positions || []
+      const isB = isBigPlayer(p)
+      const perim = p.attributes.perimeterDefense ?? 99
+      const interior = p.attributes.interiorDefense ?? 99
+      // A weak raw rating can be misleading if the player is badged up — Clamps/Glove/Pick Dodger
+      // etc. push the *effective* difficulty back up even though the number alone looks soft.
+      const perimBadges = matchedDefensiveBadges(p, PERIMETER_DEFENSE_BADGES)
+      const interiorBadges = matchedDefensiveBadges(p, PAINT_DEFENSE_BADGES)
+      const perimEffective = perim + defensiveBadgeScore(p, PERIMETER_DEFENSE_BADGES)
+      const interiorEffective = interior + defensiveBadgeScore(p, PAINT_DEFENSE_BADGES)
+      const badges = dedupeByName([...perimBadges, ...interiorBadges])
+      let attackHint
+      if (isB) {
+        attackHint = perim <= interior
+          ? 'stretch big — low PD means cannot guard on perimeter; use a shooter to pull them away from the paint'
+          : 'paint target — low interior defense; post up or attack the basket against them'
+      } else {
+        // A guard/wing can be a target for either reason — don't always blame perimeter defense
+        // when his real weakness is interior defense (post him up / attack the rim instead).
+        attackHint = perim <= interior
+          ? 'ISO/drive target — low perimeter defense; blow past them on the wing or in isolation'
+          : 'small-ball post target — solid on the perimeter but weak interior defense; back him down or attack the rim rather than trying to blow by him'
+      }
+      if (badges.length > 0) {
+        attackHint += ` — badged up (${badges.map(b => b.name).join(', ')}), tougher than the raw rating suggests`
+      }
+      return {
+        name: p.name, archetype: p.archetype, positions: pos, perim, interior, attackHint,
+        badges,
+        effectiveRating: perimEffective + interiorEffective,
+      }
+    })
+    .sort((a, b) => a.effectiveRating - b.effectiveRating)
+    .slice(0, 3)
+
+  const hideTargets = attackers
+    .filter(isPerimeterPlayer)
+    .map(p => {
+      const perim = p.attributes.perimeterDefense ?? 99
+      const badges = matchedDefensiveBadges(p, PERIMETER_DEFENSE_BADGES)
+      return {
+        name: p.name, archetype: p.archetype, perim,
+        badges,
+        effectiveRating: perim + defensiveBadgeScore(p, PERIMETER_DEFENSE_BADGES),
+      }
+    })
+    .sort((a, b) => a.effectiveRating - b.effectiveRating)
+    .slice(0, 3)
+
+  const leaveOpen = targets
+    .filter(isPerimeterPlayer)
+    .map(p => ({
+      name: p.name,
+      archetype: p.archetype,
+      three: p.attributes.threePointShot ?? 99,
+      mid: p.attributes.midRangeShot ?? 99,
+    }))
+    .filter(p => p.three < 80)
+    .sort((a, b) => (a.three + a.mid) - (b.three + b.mid))
+    .slice(0, 3)
+
+  const speedAdvantage = attackers
+    .filter(isPerimeterPlayer)
+    .map(attackerP => {
+      const attackerPos = attackerP.positions || []
+      const targetMatch = targets
+        .filter(p => (p.positions || []).some(pos => attackerPos.includes(pos)))
+        .sort((a, b) => (a.attributes.speed ?? 0) - (b.attributes.speed ?? 0))[0]
+      if (!targetMatch) return null
+      const diff = (attackerP.attributes.speed ?? 0) - (targetMatch.attributes.speed ?? 0)
+      return diff >= 8 ? {
+        attackerPlayer: attackerP.name,
+        attackerSpeed: attackerP.attributes.speed,
+        targetPlayer: targetMatch.name,
+        targetSpeed: targetMatch.attributes.speed,
+        diff,
+      } : null
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.diff - a.diff)
+    .slice(0, 3)
+
+  return { attackTargets, hideTargets, leaveOpen, speedAdvantage }
+}
+
+// Best individual defenders across the FULL roster (not just the rotation) — a reference for
+// specialist matchups even when the player isn't a top-8 overall piece.
+function computeBestDefenders(roster) {
+  const withAttrs = roster.filter(p => p.attributes)
+
+  // A high Perimeter Defense number alone doesn't guarantee he can stay in front of a quick
+  // guard — a slow-footed defender still gets beat off the dribble. Agility (speed + acceleration)
+  // and defensive badges (Clamps, Glove, Pick Dodger, etc.) both factor into who actually belongs
+  // at the top of this list.
+  const lockdownPerimeter = withAttrs
+    .filter(isPerimeterPlayer)
+    .map(p => {
+      const agility = ((p.attributes.speed ?? 0) + (p.attributes.agility ?? 0)) / 2
+      const badges = matchedDefensiveBadges(p, PERIMETER_DEFENSE_BADGES)
+      const badgeScore = defensiveBadgeScore(p, PERIMETER_DEFENSE_BADGES)
+      return {
+        name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions,
+        perim: p.attributes.perimeterDefense ?? 0, steal: p.attributes.steal ?? 0,
+        speed: p.attributes.speed ?? 0, agility, badges,
+        score: (p.attributes.perimeterDefense ?? 0) + (p.attributes.steal ?? 0) * 0.3 + agility * 0.4 + badgeScore,
+      }
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+
+  const paintDefenders = withAttrs
+    .filter(isBigPlayer)
+    .map(p => {
+      const badges = matchedDefensiveBadges(p, PAINT_DEFENSE_BADGES)
+      const badgeScore = defensiveBadgeScore(p, PAINT_DEFENSE_BADGES)
+      return {
+        name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions,
+        interior: p.attributes.interiorDefense ?? 0, block: p.attributes.block ?? 0, badges,
+        score: (p.attributes.interiorDefense ?? 0) + (p.attributes.block ?? 0) * 0.3 + badgeScore,
+      }
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+
+  return { lockdownPerimeter, paintDefenders }
+}
+
+// Recommends ball-screen coverage for up to two (my big, their ball-handler, their screener)
+// combos — not just a single handler vs. a single big. Reasons from the screener's pop/lob/pass
+// threat as well as the handler's pull-up threat, and gates Switch on the big's own Perimeter
+// Defense (not raw speed) since that's the stat that actually determines whether he survives
+// being switched onto a guard.
+function computePnRGuidance(myRoster, oppRoster) {
+  const withAttrs = r => r.filter(p => p.attributes)
+
+  const myBigs = withAttrs(myRoster)
+    .filter(isBigPlayer)
+    .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
+    .slice(0, 2)
+
+  const ballHandlers = withAttrs(oppRoster)
+    .filter(p => (p.positions || []).some(pos => ['PG', 'SG'].includes(pos)))
+    .map(p => ({
+      ...p,
+      handleScore: (p.attributes.ballHandle ?? 0) * 0.4 + (p.attributes.speed ?? 0) * 0.3 + (p.attributes.agility ?? 0) * 0.3,
+    }))
+    .sort((a, b) => b.handleScore - a.handleScore)
+    .slice(0, 2)
+
+  // Screeners: the opponent's top bigs, paired 1:1 with their top ball-handlers as the two most
+  // likely starting screen actions. We don't have real play-calling data, so this is a proxy —
+  // but it's a real improvement over ignoring the screener entirely.
+  const screeners = withAttrs(oppRoster)
+    .filter(isBigPlayer)
+    .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
+    .slice(0, 2)
+
+  if (!myBigs.length || !ballHandlers.length || !screeners.length) return []
+
+  const pairCount = Math.min(myBigs.length, ballHandlers.length)
+
+  return Array.from({ length: pairCount }, (_, i) => {
+    const big = myBigs[i]
+    const handler = ballHandlers[i] ?? ballHandlers[0]
+    const screener = screeners[i] ?? screeners[0]
+
+    const pullUpThreat = Math.max(handler.attributes.threePointShot ?? 0, handler.attributes.midRangeShot ?? 0)
+    const rimProtection = ((big.attributes.interiorDefense ?? 0) + (big.attributes.block ?? 0)) / 2
+    // Switchability is gated on the big's own Perimeter Defense — the stat that measures whether
+    // he can actually contain a guard in space — not on raw speed/acceleration.
+    const switchability = big.attributes.perimeterDefense ?? 0
+    const hedgeRecovery = ((big.attributes.speed ?? 0) + (big.attributes.agility ?? 0)) / 2
+    const screenerPopThreat = screener.attributes.threePointShot ?? 0
+    const screenerLobThreat = ((screener.attributes.vertical ?? 0) + (screener.attributes.closeShot ?? 0)) / 2
+    const screenerPassAccuracy = screener.attributes.passAccuracy ?? 0
+
+    let coverage, reason
+    if (screenerPopThreat >= 78) {
+      // A stretch screener makes Drop unsafe regardless of the handler's own shooting — dropping
+      // leaves the screener wide open on the pop.
+      if (switchability >= 75) {
+        coverage = 'Switch'
+        reason = `${screener.name} can pop for three (${screenerPopThreat} rated) — Drop leaves him wide open, so switch the screen with ${big.name} and live with the resulting matchup.`
+      } else if (hedgeRecovery >= 70) {
+        coverage = 'Hard Hedge'
+        reason = `${screener.name} can pop for three (${screenerPopThreat} rated), so Drop isn't safe — hedge hard with ${big.name} on ${handler.name} and closeout to the screener as he pops.`
+      } else {
+        coverage = 'Go Under'
+        reason = `${screener.name} can pop for three and ${big.name} can't switch or hedge and recover in time — go under and live with a contested pull-up rather than risk a blown closeout on the screener.`
+      }
+    } else if (pullUpThreat >= 85) {
+      if (switchability >= 75) {
+        coverage = 'Switch'
+        reason = `${handler.name} is a lethal pull-up shooter (${pullUpThreat} rated) — switch the screen with ${big.name} to take away the jumper entirely.`
+      } else if (hedgeRecovery >= 70) {
+        coverage = 'Hard Hedge'
+        reason = `${handler.name} is a lethal pull-up shooter (${pullUpThreat} rated) — hedge hard with ${big.name} to force the ball out of his hands before he can rise into it.`
+      } else {
+        coverage = 'Go Under'
+        reason = `${handler.name} is a lethal pull-up shooter and ${big.name} can't switch (weak Perimeter Defense) or hedge effectively — go under and funnel him toward help instead of risking a mismatch.`
+      }
+    } else if (rimProtection >= 80) {
+      coverage = 'Drop'
+      reason = `${big.name} protects the rim (Int. Def/Block avg ${Math.round(rimProtection)}) and ${handler.name} isn't a real shooting threat (${pullUpThreat} rated) — drop and dare the pull-up.`
+      if (screenerLobThreat >= 85) {
+        reason += ` Stay alert for the lob — ${screener.name} finishes above the rim.`
+      }
+    } else if (hedgeRecovery >= 75) {
+      coverage = 'Soft Hedge'
+      reason = `${big.name} has the mobility (avg ${Math.round(hedgeRecovery)}) to hedge and recover without opening an easy roll.`
+    } else {
+      coverage = 'Go Under'
+      reason = `${big.name} lacks rim protection and mobility — keep the guard going under the screen rather than put ${big.name} in space.`
+    }
+
+    // Short-roll passing is the SCREENER's read after diving to the elbow, not the handler's kick-out passing.
+    if (screenerPassAccuracy >= 85 && coverage !== 'Switch') {
+      reason += ` Watch the short roll — ${screener.name} passes well off the catch (${screenerPassAccuracy} rating).`
+    }
+
+    return { big: big.name, handler: handler.name, screener: screener.name, coverage, reason }
+  })
+}
+
+// Identifies the opponent's rim-camping anchor — their best paint defender — and produces
+// personnel-specific tactics from MY roster to exploit the classic human-opponent pattern of
+// parking a great shot-blocker in the paint all game. Every tactic only fires when the anchor's
+// own attributes actually support it (e.g. no "drag him out" tip unless his 3PT is genuinely bad).
+function computeBigManExploit(myRoster, oppRoster) {
+  const oppBigs = oppRoster.filter(p => p.attributes && isBigPlayer(p))
+  if (!oppBigs.length) return null
+
+  const anchor = [...oppBigs].sort((a, b) =>
+    ((b.attributes.interiorDefense ?? 0) + (b.attributes.block ?? 0)) -
+    ((a.attributes.interiorDefense ?? 0) + (a.attributes.block ?? 0))
+  )[0]
+  const a = anchor.attributes
+
+  const mobility = ((a.speed ?? 0) + (a.agility ?? 0)) / 2
+  const perimThreat = a.perimeterDefense ?? 0
+  const popThreat = a.threePointShot ?? 0
+  const rebounding = ((a.offensiveRebound ?? 0) + (a.defensiveRebound ?? 0)) / 2
+
+  const myAll = myRoster.filter(p => p.attributes)
+  const myBigs = myAll.filter(isBigPlayer)
+  const myPerim = myAll.filter(isPerimeterPlayer)
+
+  const stretchBigs = [...myBigs]
+    .filter(p => (p.attributes.threePointShot ?? 0) >= 74)
+    .sort((a, b) => (b.attributes.threePointShot ?? 0) - (a.attributes.threePointShot ?? 0))
+    .slice(0, 2)
+  const finishers = [...myAll]
+    .sort((a, b) => (b.attributes.closeShot ?? 0) - (a.attributes.closeShot ?? 0))
+    .slice(0, 2)
+  const foulBaiters = [...myAll]
+    .filter(p => (p.attributes.drawFoul ?? 0) >= 75)
+    .sort((a, b) => (b.attributes.drawFoul ?? 0) - (a.attributes.drawFoul ?? 0))
+    .slice(0, 2)
+  const weakSideShooters = [...myPerim]
+    .sort((a, b) => (b.attributes.threePointShot ?? 0) - (a.attributes.threePointShot ?? 0))
+    .slice(0, 2)
+  const offRebBigs = [...myBigs]
+    .sort((a, b) => (b.attributes.offensiveRebound ?? 0) - (a.attributes.offensiveRebound ?? 0))
+    .slice(0, 2)
+
+  const tactics = []
+
+  if (popThreat < 70) {
+    tactics.push({
+      title: 'Drag him out of the paint',
+      detail: stretchBigs.length
+        ? `${anchor.name} has no real outside shot himself (${popThreat} 3PT) — play ${stretchBigs.map(p => p.name).join(' or ')} at the 4/5. He either follows out to the arc and abandons the rim, or sits home and gives up open threes.`
+        : `${anchor.name} has no real outside shot himself (${popThreat} 3PT), but nobody in your rotation shoots well enough at the 4/5 to punish him for camping — a small-ball look would help here.`,
+    })
+  }
+
+  if (mobility < 70) {
+    tactics.push({
+      title: 'Push it before he sets up',
+      detail: `${anchor.name} isn't fast (Speed/Agility avg ${Math.round(mobility)}) — attack in early offense and transition before he gets back to camp the paint.`,
+    })
+  }
+
+  tactics.push({
+    title: 'Finish away from his contest',
+    detail: `${anchor.name} blocks shots at a ${a.block ?? 0} rating — stop challenging him directly at the rim.${finishers.length ? ` Use ${finishers.map(p => p.name).join(' and ')} for floaters and push shots he can't reach.` : ''}`,
+  })
+
+  if (foulBaiters.length) {
+    tactics.push({
+      title: 'Pump-fake and draw the foul',
+      detail: `${foulBaiters.map(p => p.name).join(' and ')} draw fouls well (${foulBaiters.map(p => p.attributes.drawFoul).join('/')} rated) — a shot-blocker camping in the paint waiting to contest is exactly the guy who bites on a pump fake into contact.`,
+    })
+  }
+
+  if (perimThreat < 60 && weakSideShooters.length) {
+    tactics.push({
+      title: 'Skip pass to the weak side',
+      detail: `${anchor.name} rarely leaves the paint (Per. Def ${perimThreat}) — swing the ball and let ${weakSideShooters.map(p => p.name).join(' or ')} shoot from the weak-side corner before he can rotate out.`,
+    })
+  }
+
+  if (rebounding < 82 && offRebBigs.length) {
+    tactics.push({
+      title: 'Crash the offensive glass',
+      detail: `${anchor.name}'s rebounding (avg ${Math.round(rebounding)}) isn't elite for a full-time rim-camper — send ${offRebBigs.map(p => p.name).join(' or ')} to crash on missed threes.`,
+    })
+  }
+
+  return {
+    anchor: {
+      name: anchor.name, overall: anchor.overall, positions: anchor.positions, archetype: anchor.archetype,
+      interior: a.interiorDefense ?? 0, block: a.block ?? 0, perim: perimThreat, speed: a.speed ?? 0, threePointShot: popThreat,
+    },
+    tactics,
+  }
+}
 
 function computeMatchupEdges(myRoster, oppRoster) {
   const PERIM = ['PG', 'SG', 'SF']
@@ -90,11 +499,48 @@ function computeMatchupEdges(myRoster, oppRoster) {
   ]
 }
 
+function TierBadge({ badge, className }) {
+  return (
+    <Badge variant="outline" className={cn('border-border bg-card text-secondary-foreground', className)}>
+      {badge.name}{badge.tier ? ` · ${getBadgeTierLabel(badge.tier)}` : ''}
+    </Badge>
+  )
+}
+
+function DefBadgeChips({ badges }) {
+  if (!badges || badges.length === 0) return null
+  return (
+    <div className="mt-1 flex flex-wrap gap-1.5">
+      {badges.map((b, j) => (
+        <TierBadge key={j} badge={b} className="px-1.5 text-[11px] font-medium" />
+      ))}
+    </div>
+  )
+}
+
 function Spinner({ small, label, center }) {
   return (
-    <div className={`spinner-wrap${center ? ' center-loading' : ''}`}>
-      <div className={`spinner${small ? ' spinner-sm' : ''}`} />
+    <div className={`flex flex-col items-center justify-center gap-3 p-8 text-sm text-muted-foreground${center ? ' mt-10' : ''}`}>
+      <Loader2 className={`animate-spin ${small ? 'size-5' : 'size-8'}`} />
       {label && <span>{label}</span>}
+    </div>
+  )
+}
+
+// Shaped like the roster list it's standing in for — a skeleton makes sense
+// here because we already know exactly what's about to render.
+function RosterSkeleton({ rows = 6 }) {
+  return (
+    <div className="flex flex-col gap-2 p-2" aria-hidden="true">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 p-2">
+          <Skeleton className="size-7 rounded-full" />
+          <div className="flex flex-1 flex-col gap-1.5">
+            <Skeleton className="h-3 w-3/5" />
+            <Skeleton className="h-3 w-2/5" />
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -138,7 +584,7 @@ const DEFENSE_STATS = [
 
 const ATHLETIC_STATS = [
   { label: 'Speed', key: 'speed' },
-  { label: 'Acceleration', key: 'acceleration' },
+  { label: 'Agility', key: 'agility' },
   { label: 'Strength', key: 'strength' },
   { label: 'Vertical', key: 'vertical' },
 ]
@@ -164,16 +610,9 @@ function BadgeList({ badges }) {
   })
 
   return (
-    <div className="badge-list">
+    <div className="flex flex-wrap gap-1.5">
       {sorted.map((badge, i) => (
-        <span
-          key={i}
-          className="badge-chip"
-          style={{ borderColor: getBadgeTierColor(badge.tier), color: getBadgeTierColor(badge.tier) }}
-        >
-          {badge.name}
-          {badge.tier && <span className="badge-tier"> · {getBadgeTierLabel(badge.tier)}</span>}
-        </span>
+        <TierBadge key={i} badge={badge} className="font-medium" />
       ))}
     </div>
   )
@@ -213,14 +652,18 @@ function PlayerCard({ player, teamName }) {
   return (
     <div className={`player-card ${expanded ? 'expanded' : ''}`}>
       <button className="player-card-header" onClick={handleExpand} aria-expanded={expanded}>
+        <Avatar className="size-8">
+          {player.playerImage && <AvatarImage src={player.playerImage} alt="" />}
+          <AvatarFallback>{player.name?.[0] ?? '?'}</AvatarFallback>
+        </Avatar>
         <span className="player-name">{player.name}</span>
         <span className="player-meta">
-          {player.positions && <span className="player-pos">{Array.isArray(player.positions) ? player.positions[0] : player.positions}</span>}
-          {overall && (
-            <span className="player-overall" style={{ color: getRatingColor(overall) }}>
-              {overall}
+          {player.positions && (
+            <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+              {Array.isArray(player.positions) ? player.positions[0] : player.positions}
             </span>
           )}
+          {overall && <RatingChip value={overall} />}
         </span>
         <span className="expand-arrow">{expanded ? '▲' : '▼'}</span>
       </button>
@@ -232,12 +675,10 @@ function PlayerCard({ player, teamName }) {
           {detail && !loading && (
             <div className="player-detail">
               {detail.playerImage && (
-                <img
-                  className="player-headshot"
-                  src={detail.playerImage}
-                  alt={detail.name}
-                  onError={e => { e.target.style.display = 'none' }}
-                />
+                <Avatar className="size-16 self-center border-2">
+                  <AvatarImage src={detail.playerImage} alt={detail.name} />
+                  <AvatarFallback className="text-lg">{detail.name?.[0] ?? '?'}</AvatarFallback>
+                </Avatar>
               )}
               <div className="player-header-info">
                 <div className="player-detail-name">{detail.name}</div>
@@ -271,26 +712,30 @@ function PlayerCard({ player, teamName }) {
 
 function TeamPanel({ side, selectedTeam, onTeamChange, teams, roster, loading, error }) {
   const label = side === 'my' ? 'My Team' : "Opponent's Team"
+  const teamLogo = teams.find(t => t.teamName === selectedTeam)?.logo
 
   return (
     <div className={`team-panel team-panel--${side}`}>
       <div className="panel-header">
-        <h2>{label}</h2>
-        <select
-          className="team-select"
-          value={selectedTeam}
-          onChange={e => onTeamChange(e.target.value)}
-        >
-          <option value="">— Select Team —</option>
-          {teams.map(t => (
-            <option key={t.teamName} value={t.teamName}>
-              {t.teamName}
-            </option>
-          ))}
-        </select>
+        <div className="panel-header-title">
+          {teamLogo && <img className="size-6 shrink-0 object-contain" src={teamLogo} alt="" onError={e => { e.target.style.display = 'none' }} />}
+          <h2>{label}</h2>
+        </div>
+        <Select value={selectedTeam || undefined} onValueChange={onTeamChange}>
+          <SelectTrigger className="w-full sm:w-[220px]">
+            <SelectValue placeholder="— Select Team —" />
+          </SelectTrigger>
+          <SelectContent>
+            {teams.map(t => (
+              <SelectItem key={t.teamName} value={t.teamName}>
+                {t.teamName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      {loading && <Spinner small label="Loading roster…" />}
+      {loading && <RosterSkeleton />}
       {error && <div className="api-error">Error: {error}</div>}
 
       {roster.length > 0 && (
@@ -308,16 +753,6 @@ function TeamPanel({ side, selectedTeam, onTeamChange, teams, roster, loading, e
   )
 }
 
-function findWeakLinks(roster, rosterDetails, statKey, label) {
-  const withStats = rosterDetails.filter(p => p && p[statKey] !== undefined)
-  if (!withStats.length) return null
-  const sorted = [...withStats].sort((a, b) => parseInt(a[statKey]) - parseInt(b[statKey]))
-  return sorted.slice(0, 3).map(p => ({
-    name: p.name || p.player_name,
-    value: p[statKey],
-  }))
-}
-
 function dedupeByName(list) {
   const seen = new Set()
   return (list || []).filter(b => {
@@ -327,83 +762,37 @@ function dedupeByName(list) {
   })
 }
 
-function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
+// A short preview shown when the game plan is minimized — first sentence-ish chunk, not a mid-word cut.
+function summarizePlan(text, maxLen = 160) {
+  if (!text) return ''
+  const trimmed = text.trim()
+  if (trimmed.length <= maxLen) return trimmed
+  return trimmed.slice(0, maxLen).replace(/\s+\S*$/, '') + '…'
+}
+
+function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam, token, teams }) {
+  const myTeamLogo = teams?.find(t => t.teamName === myTeam)?.logo
+  const oppTeamLogo = teams?.find(t => t.teamName === opponentTeam)?.logo
   const [gamePlan, setGamePlan] = useState(null)
   const [planLoading, setPlanLoading] = useState(false)
   const [planError, setPlanError] = useState(null)
+  const [planMinimized, setPlanMinimized] = useState(false)
   const [activeTab, setActiveTab] = useState('scouting')
   const [opponentStrategy, setOpponentStrategy] = useState('')
 
-  const isPerimeter = p => (p.positions || []).some(pos => PERIMETER.includes(pos))
-  const isBig = p => (p.positions || []).some(pos => BIGS.includes(pos))
+  // Starting five (5v5) is used only for on-court assignments — bestMatchups can't put more
+  // than 5 defenders on the floor. Everything else scouts the full rotation (top 8 by overall)
+  // so bench pieces a good opponent will actually play show up too.
+  const myStartingFive = topByOverall(myRoster, 5)
+  const oppStartingFive = topByOverall(opponentRoster, 5)
+  const myRotation = topByOverall(myRoster, ROTATION_SIZE)
+  const oppRotation = topByOverall(opponentRoster, ROTATION_SIZE)
 
-  const topN = (roster, n = 5) => [...roster]
-    .filter(p => p.attributes)
-    .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
-    .slice(0, n)
+  const myReport = computeScoutingReport(myRoster, opponentRoster)
+  const theirReport = computeScoutingReport(opponentRoster, myRoster)
+  const { attackTargets, hideTargets, leaveOpen, speedAdvantage } = myReport
 
-  const myStarters = topN(myRoster)
-  const oppStarters = topN(opponentRoster)
-
-  const attackTargets = oppStarters
-    .map(p => {
-      const pos = p.positions || []
-      const isB = pos.some(pp => BIGS.includes(pp))
-      const perim = p.attributes.perimeterDefense ?? 99
-      const interior = p.attributes.interiorDefense ?? 99
-      let attackHint
-      if (isB) {
-        attackHint = perim <= interior
-          ? 'stretch big — low PD means cannot guard on perimeter; use a shooter to pull them away from the paint'
-          : 'paint target — low interior defense; post up or attack the basket against them'
-      } else {
-        attackHint = 'ISO/drive target — low perimeter defense; blow past them on the wing or in isolation'
-      }
-      return { name: p.name, archetype: p.archetype, positions: pos, perim, interior, attackHint }
-    })
-    .sort((a, b) => (a.perim + a.interior) - (b.perim + b.interior))
-    .slice(0, 3)
-
-  const hideTargets = myStarters
-    .filter(p => isPerimeter(p))
-    .map(p => ({ name: p.name, archetype: p.archetype, perim: p.attributes.perimeterDefense ?? 99 }))
-    .sort((a, b) => a.perim - b.perim)
-    .slice(0, 3)
-
-  const leaveOpen = oppStarters
-    .filter(p => isPerimeter(p))
-    .map(p => ({
-      name: p.name,
-      archetype: p.archetype,
-      three: p.attributes.threePointShot ?? 99,
-      mid: p.attributes.midRangeShot ?? 99,
-    }))
-    .filter(p => p.three < 80)
-    .sort((a, b) => (a.three + a.mid) - (b.three + b.mid))
-    .slice(0, 3)
-
-  const speedAdvantage = myStarters
-    .filter(p => isPerimeter(p))
-    .map(myP => {
-      const oppPos = myP.positions || []
-      const oppMatch = oppStarters
-        .filter(p => (p.positions || []).some(pos => oppPos.includes(pos)))
-        .sort((a, b) => (a.attributes.speed ?? 0) - (b.attributes.speed ?? 0))[0]
-      if (!oppMatch) return null
-      const diff = (myP.attributes.speed ?? 0) - (oppMatch.attributes.speed ?? 0)
-      return diff >= 8 ? {
-        myPlayer: myP.name,
-        mySpeed: myP.attributes.speed,
-        oppPlayer: oppMatch.name,
-        oppSpeed: oppMatch.attributes.speed,
-        diff,
-      } : null
-    })
-    .filter(Boolean)
-    .sort((a, b) => b.diff - a.diff)
-    .slice(0, 3)
-
-  const clutchPlayers = myStarters
+  const clutchPlayers = myRotation
     .map(p => ({
       name: p.name,
       overall: p.overall,
@@ -416,31 +805,28 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
     .slice(0, 3)
 
   const HOF_TIERS = ['legendary', 'hall of fame', 'gold']
-  const myTopPlayers = [...myRoster]
-    .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
-    .slice(0, 5)
-    .map(p => ({
-      name: p.name,
-      overall: p.overall,
-      badges: dedupeByName(p.badges?.list).filter(b =>
-        HOF_TIERS.some(t => (b.tier || '').toLowerCase().includes(t))
-      ),
-    }))
+  const myTopPlayers = myRotation.map(p => ({
+    name: p.name,
+    overall: p.overall,
+    badges: dedupeByName(p.badges?.list).filter(b =>
+      HOF_TIERS.some(t => (b.tier || '').toLowerCase().includes(t))
+    ),
+  }))
 
   const bestMatchups = (() => {
-    const threats = oppStarters
+    const threats = oppStartingFive
     const usedDefenders = new Set()
     return threats.map(threat => {
       const oppPos = threat.positions || []
-      const isBig = oppPos.some(p => BIGS.includes(p))
+      const isBig = isBigPlayer(threat)
       // Stretch bigs (PF/C with 3PT ≥ 78) need a perimeter defender, not a shot blocker
       const isStretchBig = isBig && (threat.attributes?.threePointShot ?? 0) >= 78
       const big = isBig && !isStretchBig
       const defStat = big ? 'interiorDefense' : 'perimeterDefense'
       const statLabel = big ? 'Interior Defense' : 'Perimeter Defense'
 
-      const samePos = myStarters.filter(p => !usedDefenders.has(p.name) && (p.positions || []).some(pos => oppPos.includes(pos)))
-      const pool = samePos.length > 0 ? samePos : myStarters.filter(p => !usedDefenders.has(p.name))
+      const samePos = myStartingFive.filter(p => !usedDefenders.has(p.name) && (p.positions || []).some(pos => oppPos.includes(pos)))
+      const pool = samePos.length > 0 ? samePos : myStartingFive.filter(p => !usedDefenders.has(p.name))
       const defender = [...pool].sort((a, b) => (b.attributes[defStat] ?? 0) - (a.attributes[defStat] ?? 0))[0]
       if (defender) usedDefenders.add(defender.name)
 
@@ -456,6 +842,10 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
     }).filter(Boolean)
   })()
 
+  const bestDefenders = computeBestDefenders(myRoster)
+  const pnrGuidance = computePnRGuidance(myRoster, opponentRoster)
+  const bigManExploit = computeBigManExploit(myRoster, opponentRoster)
+
   async function getAIGamePlan() {
     setPlanLoading(true)
     setPlanError(null)
@@ -467,24 +857,42 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
         .slice(0, 5)
         .map(b => `${b.name} (${getBadgeTierLabel(b.tier)})`)
 
-      const myKeyPlayers = [...myRoster]
-        .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
-        .slice(0, 5)
-        .map(p => ({ name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions, badges: topBadges(p) }))
+      const myKeyPlayers = myRotation.map((p, i) => ({ name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions, badges: topBadges(p), bench: i >= 5 }))
+      const oppKeyPlayers = oppRotation.map((p, i) => ({ name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions, badges: topBadges(p), bench: i >= 5 }))
 
-      const oppKeyPlayers = [...opponentRoster]
-        .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0))
-        .slice(0, 5)
-        .map(p => ({ name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions, badges: topBadges(p) }))
+      const speedAdvantagePayload = speedAdvantage.map(m => ({
+        myPlayer: m.attackerPlayer, mySpeed: m.attackerSpeed, oppPlayer: m.targetPlayer, oppSpeed: m.targetSpeed, diff: m.diff,
+      }))
+      const theirSpeedAdvantage = theirReport.speedAdvantage.map(m => ({
+        theirPlayer: m.attackerPlayer, theirSpeed: m.attackerSpeed, myPlayer: m.targetPlayer, mySpeed: m.targetSpeed, diff: m.diff,
+      }))
+
+      const topDefenders = {
+        lockdownPerimeter: bestDefenders.lockdownPerimeter.slice(0, 2).map(p => ({ name: p.name, perim: p.perim })),
+        paintDefenders: bestDefenders.paintDefenders.slice(0, 2).map(p => ({ name: p.name, interior: p.interior })),
+      }
+
+      const lineupsPayload = lineups.map(l => ({ name: l.name, desc: l.desc, players: l.players.map(p => p.name) }))
 
       const res = await fetch(GAMEPLAN_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           myTeam, opponentTeam,
           attackTargets, hideTargets, leaveOpen,
-          speedAdvantage, bestMatchups,
+          speedAdvantage: speedAdvantagePayload, bestMatchups,
           myKeyPlayers, oppKeyPlayers,
+          pnrGuidance,
+          theirAttackTargets: theirReport.attackTargets,
+          theirHideTargets: theirReport.hideTargets,
+          myPlayersLeftOpen: theirReport.leaveOpen,
+          theirSpeedAdvantage,
+          topDefenders,
+          lineups: lineupsPayload,
+          bigManExploit,
           opponentStrategy: opponentStrategy.trim(),
         }),
       })
@@ -492,6 +900,7 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setGamePlan(data.gamePlan)
+      setPlanMinimized(false)
     } catch (e) {
       setPlanError(e.message)
     } finally {
@@ -501,61 +910,34 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
 
   // Lineup combinations
   const withAttrs = myRoster.filter(p => p.attributes)
-  const isBigP = p => (p.positions || []).some(pos => BIGS.includes(pos))
+  const isBigP = isBigPlayer
 
-  const closingLineup = [...withAttrs]
-    .sort((a, b) => ((b.attributes.shotIQ??0) + (b.attributes.offensiveConsistency??0) + (b.overall??0)*0.5) -
-                    ((a.attributes.shotIQ??0) + (a.attributes.offensiveConsistency??0) + (a.overall??0)*0.5))
-    .slice(0, 5)
+  const bestOverallLineup = pickPositionalLineup(withAttrs, p => p.overall ?? 0)
 
-  const paceLineup = [...withAttrs]
-    .sort((a, b) => ((b.attributes.speed??0) + (b.attributes.threePointShot??0)*1.2) -
-                    ((a.attributes.speed??0) + (a.attributes.threePointShot??0)*1.2))
-    .slice(0, 5)
-
-  const lockdownLineup = [...withAttrs]
+  const bestDefensiveLineup = [...withAttrs]
     .sort((a, b) => ((b.attributes.perimeterDefense??0) + (b.attributes.interiorDefense??0) + (b.attributes.steal??0) + (b.attributes.block??0)) -
                     ((a.attributes.perimeterDefense??0) + (a.attributes.interiorDefense??0) + (a.attributes.steal??0) + (a.attributes.block??0)))
     .slice(0, 5)
 
-  const bigPool = [...withAttrs].filter(isBigP).sort((a, b) => (b.overall??0) - (a.overall??0)).slice(0, 2)
-  const bigNames = new Set(bigPool.map(p => p.name))
-  const twinTowersLineup = [...bigPool, ...[...withAttrs].filter(p => !bigNames.has(p.name)).sort((a, b) => (b.overall??0) - (a.overall??0)).slice(0, 3)]
-
-  const shooterLineup = (() => {
-    const sorted = [...withAttrs].sort((a, b) => (b.attributes.threePointShot ?? 0) - (a.attributes.threePointShot ?? 0))
-    const slots = ['PG', 'SG', 'SF', 'PF', 'C']
-    const used = new Set()
-    const result = []
-    for (const slot of slots) {
-      const match = sorted.find(p => !used.has(p.name) && (p.positions || []).includes(slot))
-      if (match) { used.add(match.name); result.push(match) }
-    }
-    // fill any remaining slots from the sorted pool
-    for (const p of sorted) {
-      if (result.length >= 5) break
-      if (!used.has(p.name)) { used.add(p.name); result.push(p) }
-    }
-    return result
-  })()
+  const best3ptLineup = pickPositionalLineup(withAttrs, p => p.attributes.threePointShot ?? 0)
 
   const lineups = [
-    { name: 'Closing Lineup', desc: 'High-IQ players for tight fourth-quarter situations', players: closingLineup,
-      getStat: p => ({ label: 'Shot IQ', val: p.attributes.shotIQ ?? '—' }) },
-    { name: 'Pace & Space', desc: 'Push tempo and stretch the floor with speed and shooting', players: paceLineup,
-      getStat: p => ({ label: 'Speed', val: p.attributes.speed ?? '—' }) },
-    { name: 'Sharpshooters', desc: 'Best 3PT shooters to space the floor and punish close-outs', players: shooterLineup,
-      getStat: p => ({ label: '3PT', val: p.attributes.threePointShot ?? '—' }) },
-    { name: 'Lockdown', desc: 'Maximum defensive pressure across all positions', players: lockdownLineup,
+    { name: 'Best Overall Lineup', desc: 'Highest-rated five available, positionally balanced', players: bestOverallLineup,
+      getStat: p => ({ label: 'OVR', val: p.overall ?? '—' }) },
+    { name: 'Best Defensive Lineup', desc: 'Maximum defensive pressure across all positions', players: bestDefensiveLineup,
       getStat: p => ({ label: isBigP(p) ? 'Int. Def' : 'Per. Def', val: (isBigP(p) ? p.attributes.interiorDefense : p.attributes.perimeterDefense) ?? '—' }) },
-    { name: 'Twin Towers', desc: 'Two bigs for interior dominance and paint presence', players: twinTowersLineup,
-      getStat: p => ({ label: isBigP(p) ? 'Int. Def' : 'Speed', val: (isBigP(p) ? p.attributes.interiorDefense : p.attributes.speed) ?? '—' }) },
+    { name: 'Best 3PT Lineup', desc: 'Best 3PT shooters to space the floor and punish close-outs', players: best3ptLineup,
+      getStat: p => ({ label: '3PT', val: p.attributes.threePointShot ?? '—' }) },
   ]
 
   const edges = computeMatchupEdges(myRoster, opponentRoster)
   const TABS = [
     { id: 'scouting', label: 'Scouting' },
+    { id: 'best', label: 'Best Defenders' },
     { id: 'matchups', label: 'Matchups' },
+    { id: 'pnr', label: 'Pick & Roll' },
+    { id: 'beatthebig', label: 'Beat Their Big' },
+    { id: 'theirplan', label: 'Their Game Plan' },
     { id: 'lineups', label: 'Lineups' },
     { id: 'ai-plan', label: 'AI Plan' },
   ]
@@ -563,7 +945,11 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
   return (
     <div className="matchup-analyzer">
       <h2 className="analyzer-title">Matchup Analyzer</h2>
-      <p className="analyzer-subtitle">{myTeam} vs {opponentTeam}</p>
+      <p className="analyzer-subtitle">
+        {myTeamLogo && <img className="size-5 shrink-0 object-contain" src={myTeamLogo} alt="" onError={e => { e.target.style.display = 'none' }} />}
+        {myTeam} vs {opponentTeam}
+        {oppTeamLogo && <img className="size-5 shrink-0 object-contain" src={oppTeamLogo} alt="" onError={e => { e.target.style.display = 'none' }} />}
+      </p>
 
       <div className="matchup-edges-card">
         <div className="matchup-edges-header">
@@ -574,8 +960,8 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
         {edges.map((e, i) => {
           const myWins = e.my > e.opp
           const tie = e.my === e.opp
-          const myColor  = tie ? '#64748b' : myWins ? '#22c55e' : '#ef4444'
-          const oppColor = tie ? '#64748b' : !myWins ? '#22c55e' : '#ef4444'
+          const myColor  = tie ? 'var(--rating-weak)' : myWins ? 'var(--rating-strong)' : 'var(--ring)'
+          const oppColor = tie ? 'var(--rating-weak)' : !myWins ? 'var(--rating-strong)' : 'var(--ring)'
           return (
             <div key={i} className="edge-row">
               <span className="edge-val" style={{ color: myColor }}>{e.my}</span>
@@ -586,13 +972,15 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
         })}
       </div>
 
-      <div className="analyzer-tabs">
-        {TABS.map(tab => (
-          <button key={tab.id} className={`analyzer-tab${activeTab === tab.id ? ' active' : ''}`} onClick={() => setActiveTab(tab.id)}>
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
+        <TabsList className="h-auto w-full flex-wrap justify-start">
+          {TABS.map(tab => (
+            <TabsTrigger key={tab.id} value={tab.id} className="flex-none">
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
       {activeTab === 'scouting' && (
         <div className="analysis-grid">
@@ -601,13 +989,18 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
             <p className="analysis-hint">Weakest defenders on {opponentTeam}</p>
             {attackTargets.length === 0 && <p className="no-data">Insufficient data</p>}
             {attackTargets.map((p, i) => (
-              <div key={i} className="analysis-row">
-                <span className="analysis-name">{p.name}</span>
-                <span className="analysis-stats">
-                  <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
-                  {' / '}
-                  <span style={{ color: getRatingColor(p.interior) }}>Int. Def {p.interior}</span>
-                </span>
+              <div key={i} className="analysis-row-block">
+                <div className="analysis-row">
+                  <span className="analysis-name">
+                    {p.name}
+                  </span>
+                  <span className="analysis-stats">
+                    <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
+                    {' / '}
+                    <span style={{ color: getRatingColor(p.interior) }}>Int. Def {p.interior}</span>
+                  </span>
+                </div>
+                <DefBadgeChips badges={p.badges} />
               </div>
             ))}
           </div>
@@ -617,11 +1010,16 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
             <p className="analysis-hint">Weakest perimeter defenders on {myTeam}</p>
             {hideTargets.length === 0 && <p className="no-data">Insufficient data</p>}
             {hideTargets.map((p, i) => (
-              <div key={i} className="analysis-row">
-                <span className="analysis-name">{p.name}</span>
-                <span className="analysis-stats">
-                  <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
-                </span>
+              <div key={i} className="analysis-row-block">
+                <div className="analysis-row">
+                  <span className="analysis-name">
+                    {p.name}
+                  </span>
+                  <span className="analysis-stats">
+                    <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
+                  </span>
+                </div>
+                <DefBadgeChips badges={p.badges} />
               </div>
             ))}
           </div>
@@ -650,13 +1048,13 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
               <div key={i} className="analysis-row">
                 <div className="matchup-pair">
                   <span className="matchup-threat">
-                    {m.myPlayer}
-                    <span style={{ color: getRatingColor(m.mySpeed), marginLeft: 6, fontSize: 12 }}>Speed {m.mySpeed}</span>
+                    {m.attackerPlayer}
+                    <span style={{ color: getRatingColor(m.attackerSpeed), marginLeft: 6, fontSize: 12 }}>Speed {m.attackerSpeed}</span>
                   </span>
                   <span className="matchup-arrow">vs</span>
                   <span className="matchup-defender">
-                    {m.oppPlayer}
-                    <span style={{ color: getRatingColor(m.oppSpeed), marginLeft: 6, fontSize: 12 }}>Speed {m.oppSpeed}</span>
+                    {m.targetPlayer}
+                    <span style={{ color: getRatingColor(m.targetSpeed), marginLeft: 6, fontSize: 12 }}>Speed {m.targetSpeed}</span>
                   </span>
                 </div>
               </div>
@@ -674,6 +1072,50 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
                   {' / '}
                   <span style={{ color: getRatingColor(p.offCon) }}>Off. Con {p.offCon}</span>
                 </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'best' && (
+        <div className="analysis-grid">
+          <div className="analysis-card">
+            <div className="analysis-card-title">Best Lockdown Perimeter Defenders</div>
+            <p className="analysis-hint">Full {myTeam} roster, ranked by Perimeter Defense + agility + defensive badges — a high rating with slow feet still gets beat off the dribble</p>
+            {bestDefenders.lockdownPerimeter.length === 0 && <p className="no-data">Insufficient data</p>}
+            {bestDefenders.lockdownPerimeter.map((p, i) => (
+              <div key={i} className="analysis-row-block">
+                <div className="analysis-row">
+                  <span className="analysis-name">{p.name}</span>
+                  <span className="analysis-stats">
+                    <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
+                    {' / '}
+                    <span style={{ color: getRatingColor(p.speed) }}>Speed {p.speed}</span>
+                    {' / '}
+                    <span style={{ color: getRatingColor(p.steal) }}>Steal {p.steal}</span>
+                  </span>
+                </div>
+                <DefBadgeChips badges={p.badges} />
+              </div>
+            ))}
+          </div>
+
+          <div className="analysis-card">
+            <div className="analysis-card-title">Best Paint Defenders</div>
+            <p className="analysis-hint">Full {myTeam} roster, ranked by Interior Defense + Block + defensive badges</p>
+            {bestDefenders.paintDefenders.length === 0 && <p className="no-data">Insufficient data</p>}
+            {bestDefenders.paintDefenders.map((p, i) => (
+              <div key={i} className="analysis-row-block">
+                <div className="analysis-row">
+                  <span className="analysis-name">{p.name}</span>
+                  <span className="analysis-stats">
+                    <span style={{ color: getRatingColor(p.interior) }}>Int. Def {p.interior}</span>
+                    {' / '}
+                    <span style={{ color: getRatingColor(p.block) }}>Block {p.block}</span>
+                  </span>
+                </div>
+                <DefBadgeChips badges={p.badges} />
               </div>
             ))}
           </div>
@@ -712,16 +1154,157 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
                   {' '}{p.name}
                 </div>
                 {p.badges.length > 0 ? (
-                  <div className="badge-player-chips">
+                  <div className="flex flex-wrap gap-1.5">
                     {p.badges.map((b, j) => (
-                      <span key={j} className="badge-chip small" style={{ borderColor: getBadgeTierColor(b.tier), color: getBadgeTierColor(b.tier) }}>
-                        {b.name} · {getBadgeTierLabel(b.tier)}
-                      </span>
+                      <TierBadge key={j} badge={b} className="px-1.5 text-[11px] font-medium" />
                     ))}
                   </div>
                 ) : (
                   <span className="no-data">No Legendary/HoF/Gold badges</span>
                 )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'pnr' && (
+        <div className="analysis-grid">
+          <div className="analysis-card analysis-card--matchups">
+            <div className="analysis-card-title">Pick-and-Roll Coverage</div>
+            <p className="analysis-hint">
+              {pnrGuidance.length > 0
+                ? `Recommended coverage for your bigs against ${opponentTeam}'s top pick-and-roll threats`
+                : 'Insufficient data for pick-and-roll coverage'}
+            </p>
+            {pnrGuidance.map((g, i) => (
+              <div key={i} className="pnr-row">
+                <div className="pnr-row-header">
+                  <span className="pnr-big">{g.big}</span>
+                  <span className="pnr-coverage-tag">{g.coverage}</span>
+                </div>
+                <p className="pnr-matchup">vs {g.handler}, screened by {g.screener}</p>
+                <p className="pnr-reason">{g.reason}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'beatthebig' && (
+        <div className="analysis-grid">
+          <div className="analysis-card analysis-card--matchups">
+            <div className="analysis-card-title">Beat Their Big</div>
+            {!bigManExploit && <p className="no-data">Insufficient data</p>}
+            {bigManExploit && (
+              <>
+                <p className="analysis-hint">
+                  {opponentTeam}'s rim anchor — the shot-blocker a lot of opponents will camp in the paint all game
+                </p>
+                <div className="pnr-row">
+                  <div className="pnr-row-header">
+                    <span className="pnr-big">{bigManExploit.anchor.name}</span>
+                    <span className="pnr-coverage-tag">{(bigManExploit.anchor.positions || [])[0] || 'Big'}</span>
+                  </div>
+                  <p className="pnr-matchup">
+                    <span style={{ color: getRatingColor(bigManExploit.anchor.interior) }}>Int. Def {bigManExploit.anchor.interior}</span>
+                    {' / '}
+                    <span style={{ color: getRatingColor(bigManExploit.anchor.block) }}>Block {bigManExploit.anchor.block}</span>
+                    {' / '}
+                    <span style={{ color: getRatingColor(bigManExploit.anchor.perim) }}>Per. Def {bigManExploit.anchor.perim}</span>
+                    {' / '}
+                    <span style={{ color: getRatingColor(bigManExploit.anchor.speed) }}>Speed {bigManExploit.anchor.speed}</span>
+                  </p>
+                </div>
+                {bigManExploit.tactics.map((t, i) => (
+                  <div key={i} className="pnr-row">
+                    <div className="pnr-row-header">
+                      <span className="pnr-big">{t.title}</span>
+                    </div>
+                    <p className="pnr-reason">{t.detail}</p>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'theirplan' && (
+        <div className="analysis-grid">
+          <div className="analysis-card">
+            <div className="analysis-card-title">What They'll Attack</div>
+            <p className="analysis-hint">Weak links on {myTeam} they'll target</p>
+            {theirReport.attackTargets.length === 0 && <p className="no-data">Insufficient data</p>}
+            {theirReport.attackTargets.map((p, i) => (
+              <div key={i} className="analysis-row-block">
+                <div className="analysis-row">
+                  <span className="analysis-name">
+                    {p.name}
+                  </span>
+                  <span className="analysis-stats">
+                    <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
+                    {' / '}
+                    <span style={{ color: getRatingColor(p.interior) }}>Int. Def {p.interior}</span>
+                  </span>
+                </div>
+                <DefBadgeChips badges={p.badges} />
+              </div>
+            ))}
+          </div>
+
+          <div className="analysis-card">
+            <div className="analysis-card-title">Defenders They'll Hide</div>
+            <p className="analysis-hint">{opponentTeam}'s weak perimeter defenders — hunt these matchups</p>
+            {theirReport.hideTargets.length === 0 && <p className="no-data">Insufficient data</p>}
+            {theirReport.hideTargets.map((p, i) => (
+              <div key={i} className="analysis-row-block">
+                <div className="analysis-row">
+                  <span className="analysis-name">
+                    {p.name}
+                  </span>
+                  <span className="analysis-stats">
+                    <span style={{ color: getRatingColor(p.perim) }}>Per. Def {p.perim}</span>
+                  </span>
+                </div>
+                <DefBadgeChips badges={p.badges} />
+              </div>
+            ))}
+          </div>
+
+          <div className="analysis-card">
+            <div className="analysis-card-title">Your Players They'll Leave Open</div>
+            <p className="analysis-hint">Poor shooters on {myTeam} — they'll sag off to help</p>
+            {theirReport.leaveOpen.length === 0 && <p className="no-data">Insufficient data</p>}
+            {theirReport.leaveOpen.map((p, i) => (
+              <div key={i} className="analysis-row">
+                <span className="analysis-name">{p.name}</span>
+                <span className="analysis-stats">
+                  <span style={{ color: getRatingColor(p.three) }}>Three-Point {p.three}</span>
+                  {' / '}
+                  <span style={{ color: getRatingColor(p.mid) }}>Mid-Range {p.mid}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="analysis-card">
+            <div className="analysis-card-title">Their Speed Advantage</div>
+            <p className="analysis-hint">Where they'll try to blow by you</p>
+            {theirReport.speedAdvantage.length === 0 && <p className="no-data">No major speed mismatches</p>}
+            {theirReport.speedAdvantage.map((m, i) => (
+              <div key={i} className="analysis-row">
+                <div className="matchup-pair">
+                  <span className="matchup-threat">
+                    {m.attackerPlayer}
+                    <span style={{ color: getRatingColor(m.attackerSpeed), marginLeft: 6, fontSize: 12 }}>Speed {m.attackerSpeed}</span>
+                  </span>
+                  <span className="matchup-arrow">vs</span>
+                  <span className="matchup-defender">
+                    {m.targetPlayer}
+                    <span style={{ color: getRatingColor(m.targetSpeed), marginLeft: 6, fontSize: 12 }}>Speed {m.targetSpeed}</span>
+                  </span>
+                </div>
               </div>
             ))}
           </div>
@@ -738,6 +1321,10 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
                 const stat = lineup.getStat(p)
                 return (
                   <div key={j} className="lineup-player-row">
+                    <Avatar className="size-5">
+                      {p.playerImage && <AvatarImage src={p.playerImage} alt="" />}
+                      <AvatarFallback className="text-[9px]">{p.name?.[0] ?? '?'}</AvatarFallback>
+                    </Avatar>
                     <span className="lineup-player-pos">{(p.positions||[])[0] || '—'}</span>
                     <span className="lineup-player-name">{p.name}</span>
                     <span className="lineup-player-stat" style={{ color: getRatingColor(stat.val) }}>{stat.label} {stat.val}</span>
@@ -751,10 +1338,10 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
 
       {activeTab === 'ai-plan' && (
         <div className="ai-plan-tab">
-          <div className="strategy-input-group">
-            <label className="strategy-label">Opponent's offensive strategy (optional)</label>
-            <textarea
-              className="strategy-textarea"
+          <div className="mb-4 flex flex-col gap-1.5">
+            <Label htmlFor="opponent-strategy">Opponent's offensive strategy (optional)</Label>
+            <Textarea
+              id="opponent-strategy"
               placeholder="e.g. heavy pick and roll with their center, lots of corner 3s, iso-heavy on their best player..."
               value={opponentStrategy}
               onChange={e => setOpponentStrategy(e.target.value)}
@@ -762,16 +1349,32 @@ function MatchupAnalyzer({ myRoster, myTeam, opponentRoster, opponentTeam }) {
             />
           </div>
           {!planLoading && !gamePlan && (
-            <button className="analyze-btn ai-plan-btn" onClick={getAIGamePlan}>Get AI Game Plan</button>
+            <Button className="mt-2" onClick={getAIGamePlan}>Get AI Game Plan</Button>
           )}
           {planLoading && <Spinner label="Generating game plan…" />}
           {planError && <div className="api-error">AI error: {planError}</div>}
-          {gamePlan && (
-            <div className="game-plan">
-              <div className="game-plan-title">AI Game Plan</div>
-              <p className="game-plan-text">{gamePlan}</p>
-              <button className="analyze-btn ai-plan-regen" onClick={getAIGamePlan}>Regenerate</button>
-            </div>
+          {gamePlan && !planMinimized && (
+            <Card className="mt-4 gap-0">
+              <CardContent>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">AI Game Plan</div>
+                  <Button variant="outline" size="sm" onClick={() => setPlanMinimized(true)}>Minimize</Button>
+                </div>
+                <p className="game-plan-text">{gamePlan}</p>
+                <Button variant="secondary" size="sm" className="mt-3" onClick={getAIGamePlan}>Regenerate</Button>
+              </CardContent>
+            </Card>
+          )}
+          {gamePlan && planMinimized && (
+            <Card className="mt-4 gap-0">
+              <CardContent>
+                <div className="mb-1 flex items-center justify-between gap-3">
+                  <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">AI Game Plan (minimized)</div>
+                  <Button variant="outline" size="sm" onClick={() => setPlanMinimized(false)}>Expand</Button>
+                </div>
+                <p className="text-xs leading-relaxed text-muted-foreground">{summarizePlan(gamePlan)}</p>
+              </CardContent>
+            </Card>
           )}
         </div>
       )}
@@ -872,29 +1475,113 @@ function TeamRankings({ teams, teamsLoading }) {
       {isLoading && (
         <div className="rankings-loading">
           <Spinner center label={`Loading rosters… ${progress.done} / ${progress.total}`} />
-          <div className="progress-bar-wrap">
-            <div className="progress-bar" style={{ width: `${pct}%` }} />
-          </div>
+          <Progress value={pct} className="mx-auto mt-3 max-w-xs" />
         </div>
       )}
 
       {!isLoading && (
         <div className="rankings-grid">
-          {rankings.map(cat => (
-            <div key={cat.key} className="ranking-category">
-              <div className="ranking-category-title">{cat.label}</div>
-              {cat.rows.map((t, i) => (
-                <div key={t.name} className="ranking-row">
-                  <span className="rank-num">{i + 1}</span>
-                  <span className="rank-team">{t.name}</span>
-                  <span className="rank-val" style={{ color: getRatingColor(t.val) }}>{t.val}</span>
-                </div>
-              ))}
-              {cat.rows.length === 0 && <p className="no-data">No data</p>}
-            </div>
-          ))}
+          {rankings.map(cat => {
+            const max = cat.rows[0]?.val || 1
+            return (
+              <Card key={cat.key} className="gap-0">
+                <CardContent>
+                  <div className="mb-2 flex items-center justify-between border-b pb-2">
+                    <span className="font-mono text-[11px] font-bold tracking-widest text-muted-foreground uppercase">{cat.label}</span>
+                    <span className="font-mono text-[11px] font-bold tracking-widest text-muted-foreground uppercase">Avg ↓</span>
+                  </div>
+                  {cat.rows.map((t, i) => {
+                    const logo = teams.find(team => team.teamName === t.name)?.logo
+                    return (
+                      <div key={t.name} className="flex items-center gap-2.5 border-b py-2 last:border-b-0">
+                        <span className="w-5 shrink-0 text-right font-mono text-xs text-muted-foreground">{i + 1}</span>
+                        {logo
+                          ? <img className="size-6 shrink-0 object-contain" src={logo} alt="" onError={e => { e.target.style.visibility = 'hidden' }} />
+                          : <span className="size-6 shrink-0" />}
+                        <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{t.name.replace(/^All-Time /, '')}</span>
+                        <span className="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-muted sm:block">
+                          <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${Math.round((t.val / max) * 100)}%` }} />
+                        </span>
+                        <RatingChip value={t.val} />
+                      </div>
+                    )
+                  })}
+                  {cat.rows.length === 0 && <p className="no-data">No data</p>}
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       )}
+    </div>
+  )
+}
+
+function HistorySkeleton({ rows = 4 }) {
+  return (
+    <div className="flex flex-col gap-3" aria-hidden="true">
+      {Array.from({ length: rows }).map((_, i) => (
+        <Skeleton key={i} className="h-16 w-full rounded-xl" />
+      ))}
+    </div>
+  )
+}
+
+function GameplanHistory({ token }) {
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [openId, setOpenId] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/gameplan/history', { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => {
+        if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`)
+        return res.json()
+      })
+      .then(data => { if (!cancelled) setItems(data.gameplans || []) })
+      .catch(e => { if (!cancelled) setError(e.message) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [token])
+
+  if (loading) return <HistorySkeleton />
+  if (error) return <div className="api-error center-loading">Failed to load history: {error}</div>
+
+  if (items.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-16 text-center text-sm text-muted-foreground">
+        <IconHistory size={32} />
+        <p>No saved game plans yet — generate one from the Scout tab and it'll show up here.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {items.map(item => (
+        <Card
+          key={item.id}
+          className="cursor-pointer gap-0 transition-colors hover:ring-ring/40"
+          onClick={() => setOpenId(openId === item.id ? null : item.id)}
+        >
+          <CardContent>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-sm font-semibold">
+                {item.team_a} <span className="font-normal text-muted-foreground">vs</span> {item.team_b}
+              </div>
+              <div className="text-xs text-muted-foreground">{new Date(item.created_at).toLocaleString()}</div>
+            </div>
+            {openId === item.id && (
+              <>
+                <Separator className="mt-3" />
+                <p className="game-plan-text mt-3">{item.generated_text}</p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      ))}
     </div>
   )
 }
@@ -931,99 +1618,143 @@ async function attemptLogin(email, password) {
   return { error: 'Invalid email or password' }
 }
 
+async function attemptSignup(email, password) {
+  try {
+    const res = await fetch(`${AUTH_BASE}/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    const d = await res.json()
+    if (res.ok) return { token: d.token, user: d.user }
+    return { error: d.error || 'Failed to create account' }
+  } catch {
+    return { error: 'Could not reach the auth service' }
+  }
+}
+
 function Login({ onLogin, theme, onToggleTheme }) {
+  const [mode, setMode] = useState('signin') // 'signin' | 'signup'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
 
+  const isSignup = mode === 'signup'
+
   async function submit(e) {
     e.preventDefault()
     setBusy(true)
     setError(null)
-    const res = await attemptLogin(email, password)
+    const res = isSignup ? await attemptSignup(email, password) : await attemptLogin(email, password)
     setBusy(false)
     if (res.error) { setError(res.error); return }
     onLogin(res.token, res.user)
   }
 
+  function toggleMode() {
+    setMode(m => (m === 'signup' ? 'signin' : 'signup'))
+    setError(null)
+  }
+
   return (
-    <div className="login-screen">
-      <button className="theme-toggle login-theme-toggle" onClick={onToggleTheme} title="Toggle theme">
-        {theme === 'light' ? <IconMoon /> : <IconSun />}
-      </button>
-      <form className="login-card" onSubmit={submit}>
-        <div className="login-brand">
-          <span className="brand-mark">2K</span>
-          <span className="brand-name">Scout DEV2</span>
-        </div>
-        <h1 className="login-title">Sign in</h1>
-        <p className="login-sub">Pre-game scouting for NBA 2K All-Time teams</p>
+    <div className="flex min-h-svh items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-sm">
+        <form className="contents" onSubmit={submit}>
+          <CardHeader>
+            <div className="mb-1 flex items-center gap-2.5">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-sm font-extrabold text-primary-foreground">2K</span>
+              <span className="text-lg font-extrabold tracking-tight">Scout</span>
+            </div>
+            <CardTitle className="text-xl">{isSignup ? 'Create account' : 'Sign in'}</CardTitle>
+            <CardAction>
+              <Button
+                type="button" variant="outline" size="icon"
+                onClick={onToggleTheme} title="Toggle theme"
+              >
+                {theme === 'light' ? <IconMoon /> : <IconSun />}
+              </Button>
+            </CardAction>
+          </CardHeader>
 
-        <label className="login-label">Email</label>
-        <input className="login-input" type="email" autoComplete="username"
-          value={email} onChange={e => setEmail(e.target.value)} placeholder="scout@2kscout.app" required />
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="login-email">Email</Label>
+              <Input id="login-email" type="email" autoComplete="username"
+                value={email} onChange={e => setEmail(e.target.value)} placeholder="scout@2kscout.app" required />
+            </div>
 
-        <label className="login-label">Password</label>
-        <input className="login-input" type="password" autoComplete="current-password"
-          value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="login-password">Password</Label>
+              <Input id="login-password" type="password" autoComplete={isSignup ? 'new-password' : 'current-password'}
+                value={password} onChange={e => setPassword(e.target.value)}
+                placeholder={isSignup ? 'At least 6 characters' : '••••••••'} required minLength={isSignup ? 6 : undefined} />
+            </div>
 
-        {error && <div className="login-error">{error}</div>}
+            {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
+          </CardContent>
 
-        <button className="login-btn" type="submit" disabled={busy}>
-          {busy ? 'Signing in…' : 'Sign In'}
-        </button>
+          <CardFooter className="flex-col gap-3 border-t-0 bg-transparent">
+            <Button type="submit" size="lg" className="w-full" disabled={busy}>
+              {busy
+                ? (isSignup ? 'Creating account…' : 'Signing in…')
+                : (isSignup ? 'Create account' : 'Sign In')}
+            </Button>
 
-        <div className="login-demo">
-          Demo access — <strong>{DEMO_EMAIL}</strong> / <strong>{DEMO_PASSWORD}</strong>
-        </div>
-      </form>
+            <Button type="button" variant="link" size="sm" onClick={toggleMode}>
+              {isSignup ? 'Already have an account? Sign in' : "Don't have an account? Create one"}
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
     </div>
   )
 }
 
 function StatCard({ icon, label, value, hint }) {
   return (
-    <div className="dash-stat-card">
-      <div className="dash-stat-icon">{icon}</div>
-      <div className="dash-stat-value">{value}</div>
-      <div className="dash-stat-label">{label}</div>
-      {hint && <div className="dash-stat-hint">{hint}</div>}
-    </div>
+    <Card className="gap-0">
+      <CardContent>
+        <div className="mb-3 flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">{icon}</div>
+        <div className="text-2xl font-extrabold">{value}</div>
+        <div className="text-sm font-semibold">{label}</div>
+        {hint && <div className="mt-0.5 text-xs text-muted-foreground">{hint}</div>}
+      </CardContent>
+    </Card>
   )
 }
 
 function DashboardHome({ user, teams, teamsLoading, myTeam, oppTeam, onStart, onRankings }) {
   const ready = myTeam && oppTeam
   return (
-    <div className="dash-home">
-      <div className="dash-welcome">
-        <h2 className="dash-welcome-title">Welcome back, {user?.name || 'Scout'}</h2>
-        <p className="dash-welcome-sub">Scout any two All-Time rosters and build a game plan from pure 2K ratings.</p>
+    <div className="flex flex-col gap-6">
+      <div>
+        <h2 className="text-2xl font-extrabold tracking-tight">Welcome back, {user?.name || 'Scout'}</h2>
+        <p className="text-sm text-muted-foreground">Scout any two All-Time rosters and build a game plan from pure 2K ratings.</p>
       </div>
 
-      <div className="dash-stats-grid">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={<IconUsers />} label="All-Time Teams" value={teamsLoading ? '—' : teams.length} hint="Available to scout" />
         <StatCard icon={<IconTarget />} label="Current Matchup" value={ready ? 'Ready' : 'None'} hint={ready ? `${myTeam} vs ${oppTeam}` : 'Pick two teams to begin'} />
         <StatCard icon={<IconRankings />} label="Ranking Categories" value="5" hint="Speed · Def · 3PT · Reb" />
         <StatCard icon={<IconBolt />} label="AI Game Plans" value="On" hint="Powered by Claude" />
       </div>
 
-      <div className="dash-cta-row">
-        <button className="dash-cta primary" onClick={onStart}>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Button size="lg" className="h-auto justify-between rounded-xl p-5 text-left" onClick={onStart}>
           <div>
-            <div className="dash-cta-title">Start a Matchup</div>
-            <div className="dash-cta-sub">Select your team and an opponent</div>
+            <div className="text-[15px] font-bold">Start a Matchup</div>
+            <div className="text-[13px] font-normal opacity-80">Select your team and an opponent</div>
           </div>
           <IconArrowRight size={20} />
-        </button>
-        <button className="dash-cta" onClick={onRankings}>
+        </Button>
+        <Button variant="outline" size="lg" className="h-auto justify-between rounded-xl p-5 text-left" onClick={onRankings}>
           <div>
-            <div className="dash-cta-title">Browse Team Rankings</div>
-            <div className="dash-cta-sub">League-wide stat leaderboards</div>
+            <div className="text-[15px] font-bold">Browse Team Rankings</div>
+            <div className="text-[13px] font-normal opacity-80">League-wide stat leaderboards</div>
           </div>
           <IconArrowRight size={20} />
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -1033,6 +1764,7 @@ const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', Icon: IconDashboard },
   { id: 'scout', label: 'Scout', Icon: IconScout },
   { id: 'rankings', label: 'Rankings', Icon: IconRankings },
+  { id: 'history', label: 'History', Icon: IconHistory },
   { id: 'settings', label: 'Settings', Icon: IconSettings },
 ]
 
@@ -1119,39 +1851,66 @@ export default function App() {
   const pageTitle = NAV_ITEMS.find(n => n.id === page)?.label || 'Dashboard'
 
   return (
-    <div className="layout">
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <span className="brand-mark">2K</span>
-          <span className="brand-name">Scout DEV</span>
+    <div className="flex min-h-svh">
+      <aside className="sticky top-0 flex h-svh w-[230px] shrink-0 flex-col gap-1.5 border-r bg-card p-4">
+        <div className="flex items-center gap-2.5 px-2 pb-5">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-sm font-extrabold text-primary-foreground">2K</span>
+          <span className="text-[17px] font-extrabold tracking-tight">Scout</span>
         </div>
-        <nav className="sidebar-nav">
+        <nav className="flex flex-col gap-1">
           {NAV_ITEMS.map(({ id, label, Icon }) => (
-            <button key={id} className={`sidebar-link${page === id ? ' active' : ''}`} onClick={() => setPage(id)}>
+            <Button
+              key={id}
+              variant={page === id ? 'default' : 'ghost'}
+              className="justify-start gap-2.5 rounded-lg"
+              onClick={() => setPage(id)}
+            >
               <Icon /><span>{label}</span>
-            </button>
+            </Button>
           ))}
         </nav>
-        <button className="sidebar-link sidebar-logout" onClick={handleLogout}>
+        <Button
+          variant="ghost"
+          className="mt-auto justify-start gap-2.5 rounded-lg text-muted-foreground hover:text-destructive"
+          onClick={handleLogout}
+        >
           <IconLogout /><span>Logout</span>
-        </button>
+        </Button>
       </aside>
 
-      <div className="main">
-        <header className="topbar">
-          <h1 className="topbar-title">{pageTitle}</h1>
-          <div className="topbar-actions">
-            <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-card/80 px-6 py-3 backdrop-blur">
+          <h1 className="text-lg font-bold">{pageTitle}</h1>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="icon" onClick={toggleTheme} title="Toggle theme">
               {theme === 'light' ? <IconMoon /> : <IconSun />}
-            </button>
-            <div className="topbar-user">
-              <span className="user-avatar">{initials}</span>
-              <span className="user-name">{user?.name || 'Scout'}</span>
-            </div>
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex cursor-pointer items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+                  <Avatar className="size-8 border-0 bg-primary">
+                    <AvatarFallback className="bg-primary text-xs text-primary-foreground">{initials}</AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm font-semibold">{user?.name || 'Scout'}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                  {user?.email || DEMO_EMAIL}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setPage('settings')}>
+                  <IconSettings size={16} /> Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem variant="destructive" onSelect={handleLogout}>
+                  <IconLogout size={16} /> Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
-        <main className="content">
+        <main className="flex-1 p-6">
           {page === 'dashboard' && (
             <DashboardHome
               user={user}
@@ -1178,7 +1937,7 @@ export default function App() {
               )}
               {bothSelected && (
                 <MatchupAnalyzer myRoster={myRoster} myTeam={myTeam}
-                  opponentRoster={oppRoster} opponentTeam={oppTeam} />
+                  opponentRoster={oppRoster} opponentTeam={oppTeam} token={token} teams={teams} />
               )}
             </>
           )}
@@ -1187,32 +1946,40 @@ export default function App() {
             <TeamRankings teams={teams} teamsLoading={teamsLoading} />
           )}
 
+          {page === 'history' && (
+            <GameplanHistory token={token} />
+          )}
+
           {page === 'settings' && (
-            <div className="settings-page">
-              <div className="settings-card">
-                <div className="settings-card-title">Appearance</div>
-                <div className="settings-row">
-                  <div>
-                    <div className="settings-row-label">Theme</div>
-                    <div className="settings-row-hint">Switch between light and dark mode</div>
+            <div className="mx-auto flex max-w-xl flex-col gap-4">
+              <Card className="gap-0">
+                <CardContent>
+                  <div className="mb-3 text-xs font-bold tracking-widest uppercase text-muted-foreground">Appearance</div>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-semibold">Theme</div>
+                      <div className="text-xs text-muted-foreground">Switch between light and dark mode</div>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={toggleTheme}>
+                      {theme === 'light' ? <><IconMoon size={16} /> Dark</> : <><IconSun size={16} /> Light</>}
+                    </Button>
                   </div>
-                  <button className="settings-theme-btn" onClick={toggleTheme}>
-                    {theme === 'light' ? <><IconMoon size={16} /> Dark</> : <><IconSun size={16} /> Light</>}
-                  </button>
-                </div>
-              </div>
-              <div className="settings-card">
-                <div className="settings-card-title">Account</div>
-                <div className="settings-row">
-                  <div>
-                    <div className="settings-row-label">{user?.name || 'Scout'}</div>
-                    <div className="settings-row-hint">{user?.email || DEMO_EMAIL}</div>
+                </CardContent>
+              </Card>
+              <Card className="gap-0">
+                <CardContent>
+                  <div className="mb-3 text-xs font-bold tracking-widest uppercase text-muted-foreground">Account</div>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-semibold">{user?.name || 'Scout'}</div>
+                      <div className="text-xs text-muted-foreground">{user?.email || DEMO_EMAIL}</div>
+                    </div>
+                    <Button variant="outline" size="sm" className="hover:border-destructive hover:text-destructive" onClick={handleLogout}>
+                      <IconLogout size={16} /> Logout
+                    </Button>
                   </div>
-                  <button className="settings-logout-btn" onClick={handleLogout}>
-                    <IconLogout size={16} /> Logout
-                  </button>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
           )}
         </main>

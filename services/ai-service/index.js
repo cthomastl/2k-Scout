@@ -14,14 +14,22 @@ app.get('/healthz', (req, res) => {
   res.status(200).json({ status: 'ok' })
 })
 
-function buildPrompt({ myTeam, opponentTeam, attackTargets, hideTargets, leaveOpen, speedAdvantage, bestMatchups, myKeyPlayers, oppKeyPlayers, opponentStrategy }) {
+function buildPrompt({
+  myTeam, opponentTeam, attackTargets, hideTargets, leaveOpen, speedAdvantage, bestMatchups,
+  myKeyPlayers, oppKeyPlayers, opponentStrategy,
+  pnrGuidance, theirAttackTargets, theirHideTargets, myPlayersLeftOpen, theirSpeedAdvantage, topDefenders,
+  lineups, bigManExploit,
+}) {
   const fmt = lines => lines.length ? lines.join('\n') : '  - No data'
+  // hideTargets/attackTargets/theirAttackTargets/theirHideTargets carry `badges` as raw
+  // {name, tier} objects (not the pre-formatted strings myKeyPlayers/oppKeyPlayers use).
+  const badgeNote = p => (p.badges?.length ? ` — badged up (${p.badges.map(b => b.name).join(', ')})` : '')
 
   const attackLines = fmt(attackTargets.map(p =>
     `  - ${p.name} [${(p.positions||[]).join('/')}] Per. Def ${p.perim} / Int. Def ${p.interior} → ${p.attackHint}`
   ))
   const hideLines = fmt(hideTargets.map(p =>
-    `  - ${p.name} (Perimeter Defense ${p.perim})`
+    `  - ${p.name} (Perimeter Defense ${p.perim})${badgeNote(p)}`
   ))
   const leaveLines = fmt(leaveOpen.map(p =>
     `  - ${p.name} (Three-Point Shot ${p.three} / Mid-Range ${p.mid})`
@@ -34,12 +42,42 @@ function buildPrompt({ myTeam, opponentTeam, attackTargets, hideTargets, leaveOp
   ))
   const myRosterLines = fmt((myKeyPlayers||[]).map(p => {
     const badgeStr = p.badges?.length ? ` | Badges: ${p.badges.join(', ')}` : ''
-    return `  - ${p.name} [OVR ${p.overall}, ${(p.positions||[]).join('/')}${p.archetype ? ', ' + p.archetype : ''}]${badgeStr}`
+    const benchStr = p.bench ? ' (bench)' : ''
+    return `  - ${p.name} [OVR ${p.overall}, ${(p.positions||[]).join('/')}${p.archetype ? ', ' + p.archetype : ''}]${benchStr}${badgeStr}`
   }))
   const oppRosterLines = fmt((oppKeyPlayers||[]).map(p => {
     const badgeStr = p.badges?.length ? ` | Badges: ${p.badges.join(', ')}` : ''
-    return `  - ${p.name} [OVR ${p.overall}, ${(p.positions||[]).join('/')}${p.archetype ? ', ' + p.archetype : ''}]${badgeStr}`
+    const benchStr = p.bench ? ' (bench)' : ''
+    return `  - ${p.name} [OVR ${p.overall}, ${(p.positions||[]).join('/')}${p.archetype ? ', ' + p.archetype : ''}]${benchStr}${badgeStr}`
   }))
+
+  const lineupLines = fmt((lineups||[]).map(l =>
+    `  - ${l.name} (${l.desc}): ${(l.players||[]).join(', ')}`
+  ))
+
+  const bigManLines = bigManExploit
+    ? fmt((bigManExploit.tactics||[]).map(t => `  - ${t.title}: ${t.detail}`))
+    : '  - No data'
+
+  const pnrLines = fmt((pnrGuidance||[]).map(g =>
+    `  - ${g.big} vs ${g.handler}'s ball screens (set by ${g.screener}) → ${g.coverage}. ${g.reason}`
+  ))
+  const theirAttackLines = fmt((theirAttackTargets||[]).map(p =>
+    `  - ${p.name} [${(p.positions||[]).join('/')}] Per. Def ${p.perim} / Int. Def ${p.interior}${badgeNote(p)}`
+  ))
+  const theirHideLines = fmt((theirHideTargets||[]).map(p =>
+    `  - ${p.name} (Perimeter Defense ${p.perim})${badgeNote(p)} — their weak defender, hunt this matchup`
+  ))
+  const myLeftOpenLines = fmt((myPlayersLeftOpen||[]).map(p =>
+    `  - ${p.name} (Three-Point Shot ${p.three} / Mid-Range ${p.mid}) — they will sag off him`
+  ))
+  const theirSpeedLines = fmt((theirSpeedAdvantage||[]).map(m =>
+    `  - ${m.theirPlayer} (Speed ${m.theirSpeed}) vs ${m.myPlayer} (Speed ${m.mySpeed}) — their advantage +${m.diff}`
+  ))
+  const bestDefenderLines = fmt([
+    ...(topDefenders?.lockdownPerimeter||[]).map(p => `  - ${p.name} (Perimeter Defense ${p.perim}) — best available perimeter lockdown, may be a bench piece`),
+    ...(topDefenders?.paintDefenders||[]).map(p => `  - ${p.name} (Interior Defense ${p.interior}) — best available rim protector, may be a bench piece`),
+  ])
 
   const strategySection = opponentStrategy
     ? `\nOPPONENT'S LIKELY OFFENSIVE STRATEGY (user-provided):\n  ${opponentStrategy}\nYour defensive plan must specifically counter this strategy.\n`
@@ -47,22 +85,29 @@ function buildPrompt({ myTeam, opponentTeam, attackTargets, hideTargets, leaveOp
 
   return `You are an NBA 2K26 expert coach. Your advice is based strictly on 2K attribute ratings and 2K gameplay mechanics — nothing else. Only the numbers and badges matter.
 
-You are coaching a human player controlling ${myTeam} against ${opponentTeam}.
+You are coaching a human player controlling ${myTeam} against ${opponentTeam}. This is a tough opponent — assume they will exploit any mismatch you leave on the floor and use their full rotation, not just their starters.
 
-IMPORTANT: Build your entire game plan around the STARTING FIVE only. Do not mention bench players.
+Build your game plan around the primary rotation below. Prioritize the starters for on-court assignments, but name a bench player by name when it's specifically relevant (e.g., a defensive substitution to bring in against a particular threat).
 
-MY STARTING FIVE — ${myTeam}:
+MY ROTATION — ${myTeam}:
 ${myRosterLines}
 
-OPPONENT'S STARTING FIVE — ${opponentTeam}:
+OPPONENT'S ROTATION — ${opponentTeam}:
 ${oppRosterLines}
 
+My best available defenders (may include bench pieces — call them in when relevant):
+${bestDefenderLines}
+
+LINEUP OPTIONS (already computed — reference these by name, do not invent other lineups):
+${lineupLines}
+
+${bigManExploit ? `BEAT THE RIM ANCHOR — ${opponentTeam} likes to camp ${bigManExploit.anchor.name} (Int. Def ${bigManExploit.anchor.interior}, Block ${bigManExploit.anchor.block}, Per. Def ${bigManExploit.anchor.perim}) in the paint all game. Use these exact tactics, do not invent others:\n${bigManLines}\n` : ''}
 --- 2K STAT DEFINITIONS (use these to reason correctly) ---
 Perimeter Defense: guards the arc and mid-range. Low PD on a BIG means they cannot guard on the perimeter — exploit by pulling them AWAY from the paint with a stretch player, NOT by driving into them. Low PD on a GUARD/WING means drive/ISO directly at them.
 Interior Defense: protects the paint. Low ID on any player means attack them in the paint — post up, drive into them, attack the basket against them.
 ---
 
-SCOUTING DATA:
+SCOUTING DATA — MY OFFENSE / DEFENSE AGAINST THEM:
 
 Attack targets (each entry includes how to exploit them based on their position and which stat is weak):
 ${attackLines}
@@ -78,6 +123,23 @@ ${speedLines}
 
 Defensive assignments:
 ${matchupLines}
+
+Pick-and-roll coverage (already computed — use these exact calls, do not invent different coverage):
+${pnrLines}
+
+THEIR LIKELY GAME PLAN AGAINST ME (use this to proactively warn the user):
+
+Weak links on my roster they will attack:
+${theirAttackLines}
+
+Their weak defenders they will try to hide — I should hunt these matchups:
+${theirHideLines}
+
+My players they will leave open / sag off:
+${myLeftOpenLines}
+
+Their speed advantages over my matched defenders:
+${theirSpeedLines}
 ${strategySection}
 --- 2K DEFENSIVE SETTINGS REFERENCE ---
 On-Ball Pressure: Tight = stay glued to ball-handler (good vs fast guards), Gap = allow space to cut off drive (good vs poor shooters)
@@ -93,10 +155,16 @@ COACHING RULES:
 2. For hide matchups: each hidden defender has ONE assignment for the entire game — their designated poor shooter. Do not give them any secondary assignments, rotations, or mention them covering any other player anywhere in the game plan.
 3. "Leave open" list only includes players with genuinely poor shooting (3PT < 78 AND mid < 80). If this list is empty or short, assume the opponent's perimeter players CAN shoot — do NOT recommend sagging off them or recommending Drive Help unless the list is populated.
 4. For speed mismatches: name the specific in-game action (push transition, backdoor cut, blow-by on wing).
-5. For defensive settings: pick specific values for On-Ball Pressure, Screen Defense, Hedge, Double Team Post, and Drive Help. One line each, name the reason.
-6. Every bullet must name a player and a specific action. No generic advice.
+5. For pick-and-roll coverage: use the exact calls provided — do not invent alternate coverage for those bigs.
+6. For "their game plan against me": call out by name which of my players will get hunted, which of their players I should specifically attack because they'll try to hide him, and which of my players they'll sag off — do not just repeat my own attack targets.
+7. For defensive settings: pick specific values for On-Ball Pressure, Screen Defense, Hedge, Double Team Post, and Drive Help. One line each, name the reason.
+8. "Badged up" next to a player means his defensive badges make him tougher than his raw rating alone suggests — treat him with more caution than the number implies, and don't call him an easy target without acknowledging the badges.
+9. For situational lineups: use the exact 3 lineups provided (Best Overall, Best Defensive, Best 3PT) — do not invent a different lineup. Tie each one to a specific in-game situation (protecting a late lead, need a defensive stop, trailing and need to erase a deficit fast, foul trouble on a starter, opponent going small/big).
+10. For substitution tips: name at least 2 specific bench players from MY ROTATION (marked "(bench)") and the exact situation to bring each one in — fatigue on a starter, foul trouble, a specific matchup from "My best available defenders", or a change in the opponent's approach. Do not suggest a substitution for a player not listed in my rotation.
+11. If a BEAT THE RIM ANCHOR section is present, use those exact tactics — do not invent your own way to beat the paint anchor.
+12. Every bullet must name a player and a specific action. No generic advice.
 
-Format: 5 sections with short bullet points (•). Max 4 bullets per section. Max 1 sentence per bullet. Total under 350 words. Plain text only.`
+Format: 8 sections with short bullet points (•): Offensive Attack Plan, Defensive Assignments, Pick-and-Roll Coverage, Beat Their Rim Anchor (skip this section if no BEAT THE RIM ANCHOR data was given), Protect Against Their Game Plan, Defensive Settings, Situational Lineups, Substitution Tips. Max 4 bullets per section (Situational Lineups and Substitution Tips can use 3). Max 1 sentence per bullet. Total under 650 words. Plain text only.`
 }
 
 app.post('/api/gameplan', async (req, res) => {
@@ -108,6 +176,11 @@ app.post('/api/gameplan', async (req, res) => {
     speedAdvantage = [], bestMatchups = [],
     myKeyPlayers = [], oppKeyPlayers = [],
     opponentStrategy = '',
+    pnrGuidance = [],
+    theirAttackTargets = [], theirHideTargets = [], myPlayersLeftOpen = [], theirSpeedAdvantage = [],
+    topDefenders = {},
+    lineups = [],
+    bigManExploit = null,
   } = body
 
   if (!myTeam || !opponentTeam) {
@@ -115,11 +188,16 @@ app.post('/api/gameplan', async (req, res) => {
   }
 
   try {
-    const prompt = buildPrompt({ myTeam, opponentTeam, attackTargets, hideTargets, leaveOpen, speedAdvantage, bestMatchups, myKeyPlayers, oppKeyPlayers, opponentStrategy })
+    const prompt = buildPrompt({
+      myTeam, opponentTeam, attackTargets, hideTargets, leaveOpen, speedAdvantage, bestMatchups,
+      myKeyPlayers, oppKeyPlayers, opponentStrategy,
+      pnrGuidance, theirAttackTargets, theirHideTargets, myPlayersLeftOpen, theirSpeedAdvantage, topDefenders,
+      lineups, bigManExploit,
+    })
 
     const message = await client.messages.create({
       model: 'claude-opus-4-8',
-      max_tokens: 2000,
+      max_tokens: 2800,
       messages: [{ role: 'user', content: prompt }],
     })
 
