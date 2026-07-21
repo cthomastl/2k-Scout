@@ -1663,7 +1663,7 @@ function Login({ onLogin, theme, onToggleTheme }) {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center bg-background p-4">
+    <div className="flex min-h-svh items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <form className="contents" onSubmit={submit}>
           <CardHeader>
@@ -1734,8 +1734,8 @@ function DashboardHome({ user, teams, teamsLoading, myTeam, oppTeam, onStart, on
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h2 className="text-2xl font-extrabold tracking-tight">Welcome back, {user?.name || 'Scout'}</h2>
-        <p className="text-sm text-muted-foreground">Scout any two All-Time rosters and build a game plan from pure 2K ratings.</p>
+        <h2 className="text-2xl font-extrabold tracking-tight text-white drop-shadow-sm">Welcome back, {user?.name || 'Scout'}</h2>
+        <p className="text-sm text-white/70 drop-shadow-sm">Scout any two All-Time rosters and build a game plan from pure 2K ratings.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

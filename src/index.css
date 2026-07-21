@@ -116,7 +116,14 @@
   --skeleton-shine: var(--secondary);
 }
 body {
-  background: var(--background);
+  background-color: var(--background);
+  background-image:
+    linear-gradient(180deg, rgba(6, 8, 16, 0.62) 0%, rgba(6, 8, 16, 0.86) 100%),
+    url('/court-bg.jpg');
+  background-size: cover, cover;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+  background-attachment: fixed, fixed;
   color: var(--foreground);
   font-family: var(--font-sans);
   font-size: 14px;

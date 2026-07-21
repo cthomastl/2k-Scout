@@ -703,13 +703,15 @@
 .rankings-title {
   font-size: 22px;
   font-weight: 700;
-  color: var(--text);
+  color: #fff;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
   margin: 0 0 4px;
 }
 
 .rankings-subtitle {
   font-size: 13px;
-  color: var(--text-muted);
+  color: rgb(255 255 255 / 0.7);
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
   margin: 0 0 24px;
 }
 
