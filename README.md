@@ -29,20 +29,9 @@ overall)**, with on-court assignments still scoped to the starting five:
   coverage and the opponent's likely game plan against you, reasoning strictly from 2K stats and badges
 
 ## Architecture
+<img width="3840" height="2160" alt="Architecture Diagram-selection (1)" src="https://github.com/user-attachments/assets/526cce96-c151-4bfa-abde-7b5bd090dd75" />
 
-```
-                          ┌─────────────────────────────┐
-                          │   Kubernetes (ns: 2k-scout)  │
-                          │                              │
-   Browser ──▶ Ingress ──▶│  frontend  (nginx + SPA)     │
-              (host:      │     │                         │
-              2kscout     │     ▼  /api, /auth            │
-              .local)     │  gateway  (reverse proxy)     │
-                          │     ├── /api/gameplan ─▶ ai-service ──▶ Anthropic Claude
-                          │     ├── /api/*        ─▶ team-service ─▶ nba2kapi.com (cached)
-                          │     └── /auth/*       ─▶ auth-service (JWT login)
-                          └─────────────────────────────┘
-```
+
 
 Five independently deployable services, each with its own image, health check, and
 horizontal scaling:
