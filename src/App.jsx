@@ -23,12 +23,17 @@ import { cn } from '@/lib/utils'
 import './App.css'
 
 const API_KEY = import.meta.env.VITE_NBA2K_API_KEY ?? ''
-const BASE_URL = ''
+// Origin of the backend gateway (services/gateway), e.g. https://api.example.com.
+// Empty string keeps requests relative/same-origin, matching Vite's dev proxy and the
+// in-cluster ingress setup. Set VITE_API_BASE when the UI is deployed separately from
+// the gateway (e.g. static UI on Cloudflare Pages, gateway on its own host).
+const API_BASE = import.meta.env.VITE_API_BASE ?? ''
+const BASE_URL = API_BASE
 const LAMBDA_URL = import.meta.env.VITE_LAMBDA_URL ?? ''
-// In the Kubernetes deployment the ingress routes /api/gameplan to the AI service.
+// In the Kubernetes deployment the gateway routes /api/gameplan to the AI service.
 // Fall back to the standalone Lambda URL when one is configured (legacy / local dev).
-const GAMEPLAN_URL = LAMBDA_URL || '/api/gameplan'
-const AUTH_BASE = import.meta.env.VITE_AUTH_BASE ?? '/auth'
+const GAMEPLAN_URL = LAMBDA_URL || `${API_BASE}/api/gameplan`
+const AUTH_BASE = import.meta.env.VITE_AUTH_BASE ?? `${API_BASE}/auth`
 const DEMO_EMAIL = 'scout@2kscout.app'
 const DEMO_PASSWORD = 'scout2k'
 
@@ -1535,7 +1540,7 @@ function GameplanHistory({ token }) {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/gameplan/history', { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${API_BASE}/api/gameplan/history`, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => {
         if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`)
         return res.json()
