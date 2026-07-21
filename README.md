@@ -86,6 +86,11 @@ auth service is reachable:
 scout@2kscout.app / scout2k
 ```
 
+All backend calls (`/api/*`, `/auth/*`, gameplan history) go through a single configurable
+base: `VITE_API_BASE` (empty by default, meaning same-origin/relative — matches the Vite proxy
+above and the in-cluster ingress). Set it to an absolute URL when the frontend is deployed
+separately from the backend — see "Split deployment" below.
+
 ## Containers & Kubernetes
 
 Build the service images locally:
@@ -122,6 +127,75 @@ Then follow the printed steps to apply the namespace, secrets, and manifests.
 the five services once deployed.
 
 Add `2kscout.local` to your hosts file (pointing at the ingress IP) to reach the app.
+
+## Split deployment (static UI + single-host backend)
+
+Kubernetes isn't required — the backend also runs as a plain `docker compose` stack on a
+single host (e.g. an EC2 instance), with the static frontend built separately and hosted
+anywhere that serves static files (e.g. Cloudflare Pages). This is a two-origin setup: the UI
+and the backend are on different hosts, so the UI needs to be told where the backend lives.
+
+```
+Browser
+  │  HTTPS
+  ▼
+Static UI host (e.g. Cloudflare Pages)        VITE_API_BASE baked in at build time
+  │
+  │  fetch(`${VITE_API_BASE}/api/...`)  — cross-origin HTTPS
+  ▼
+Backend host (e.g. EC2) — docker compose stack
+  ┌─────────────────────────────┐
+  │ gateway :8080 (published)   │
+  │  ├─ /api/gameplan* ─▶ ai-service   (internal only)
+  │  ├─ /api/*        ─▶ team-service (internal only)
+  │  └─ /auth/*       ─▶ auth-service (internal only)
+  └─────────────────────────────┘
+```
+
+**Backend — run the four services with `docker-compose.yml`** (repo root; no `frontend`
+service is defined, so this never builds the UI):
+
+```bash
+cp .env.example .env   # fill in NBA2K_API_KEY, ANTHROPIC_API_KEY, JWT_SECRET
+docker compose up -d --build
+```
+
+Only `gateway` publishes a port (`8080`) to the host — `team-service`, `ai-service`, and
+`auth-service` are reachable only from `gateway`, inside the compose network, the same way
+they're ClusterIP-only in the Kubernetes setup.
+
+**Exposing the backend over HTTPS.** A static UI host serves the frontend over HTTPS, so the
+backend origin must also be HTTPS or browsers will block the requests as mixed content. If the
+backend host isn't already behind TLS, a [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+is the fastest way to get one without managing a cert or opening inbound firewall ports —
+`cloudflared` makes an outbound-only connection to Cloudflare's edge:
+
+```bash
+cloudflared tunnel --protocol http2 --url http://localhost:8080
+```
+
+(`--protocol http2` avoids relying on outbound UDP/QUIC, which is blocked by default in some
+VPC/security-group setups.) A free "quick tunnel" prints a random `https://*.trycloudflare.com`
+URL and needs no Cloudflare account changes, but that URL changes every time `cloudflared`
+restarts — fine for testing, not for a stable production setup. A named tunnel on a domain you
+control in Cloudflare gives a permanent hostname instead.
+
+**Frontend — point the build at the backend's HTTPS URL.** `VITE_API_BASE` is read at build
+time, so set it wherever the static UI is built (e.g. Cloudflare Pages → Settings → Build →
+environment variables), then trigger a rebuild:
+
+```
+VITE_API_BASE=https://<your-tunnel-or-domain>
+```
+
+Two things that trip people up here:
+- **`.env` has two lookalike variables** — `NBA2K_API_KEY` (bare, read by `docker-compose.yml`)
+  and `VITE_NBA2K_API_KEY` (read by the Vite build). They hold the same underlying key but are
+  read by different processes; both need to be filled in if you ever build the frontend on the
+  same host that runs the backend.
+- **Env vars only take effect on (re)build/(re)create**, not by editing `.env` alone — after
+  changing backend secrets, run `docker compose up -d --force-recreate`; after changing
+  `VITE_API_BASE`, trigger a new frontend build/deploy.
 
 ## CI/CD
 
