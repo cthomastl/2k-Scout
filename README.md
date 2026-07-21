@@ -1,4 +1,5 @@
 # 2K Scout
+Link: https://steep-breeze-2336.christech556.workers.dev/
 
 NBA 2K scouting tool that analyzes matchups between two All-Time teams and generates an
 AI-powered game plan based purely on 2K attribute ratings. Runs as a set of containerized
