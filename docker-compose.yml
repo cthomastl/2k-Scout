@@ -1,0 +1,34 @@
+services:
+  gateway:
+    build: ./services/gateway
+    ports:
+      - "8080:8080"
+    environment:
+      AI_SERVICE_URL: http://ai-service:3002
+      TEAM_SERVICE_URL: http://team-service:3001
+      AUTH_SERVICE_URL: http://auth-service:3003
+    depends_on:
+      - ai-service
+      - team-service
+      - auth-service
+    restart: unless-stopped
+
+  team-service:
+    build: ./services/team-service
+    environment:
+      NBA2K_API_KEY: ${NBA2K_API_KEY}
+    restart: unless-stopped
+
+  ai-service:
+    build: ./services/ai-service
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    restart: unless-stopped
+
+  auth-service:
+    build: ./services/auth-service
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      DEMO_EMAIL: ${DEMO_EMAIL:-scout@2kscout.app}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-scout2k}
+    restart: unless-stopped
