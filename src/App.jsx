@@ -140,10 +140,15 @@ const PAINT_DEFENSE_BADGES = [
   'rim protector', 'paint patroller', 'post lockdown', 'brick wall',
   'boxout beast', 'rebound chaser', 'high-flying denier', 'intimidator',
 ]
+// Same idea applied to the Player Rankings leaderboards (Speed, 3PT, Rebounding) — a raw
+// attribute doesn't capture a badged-up player's real edge in that category.
+const SPEED_BADGES = ['quick first step', 'speed boost', 'unpluckable']
+const THREE_POINT_BADGES = ['deadeye', 'catch and shoot', 'corner specialist', 'limitless range', 'space creator']
+const REBOUNDING_BADGES = ['boxout beast', 'rebound chaser', 'putback boss']
 const BADGE_TIER_WEIGHT = { legendary: 5, 'hall of fame': 4, hof: 4, gold: 3, silver: 2, bronze: 1 }
 function badgeTierWeight(tier) { return BADGE_TIER_WEIGHT[(tier || '').toLowerCase()] ?? 0 }
 
-function matchedDefensiveBadges(player, badgeCatalog) {
+function matchedBadges(player, badgeCatalog) {
   return dedupeByName(player.badges?.list ?? [])
     .filter(b => badgeCatalog.includes((b.name || '').toLowerCase()))
     .sort((a, b) => badgeTierWeight(b.tier) - badgeTierWeight(a.tier))
@@ -151,8 +156,8 @@ function matchedDefensiveBadges(player, badgeCatalog) {
 
 // Points added to a raw defense rating per matched badge, scaled so a single Gold badge (≈15pts)
 // or HOF (≈20pts) meaningfully moves a player up the list — comparable to a real attribute edge.
-function defensiveBadgeScore(player, badgeCatalog) {
-  return matchedDefensiveBadges(player, badgeCatalog).reduce((sum, b) => sum + badgeTierWeight(b.tier) * 5, 0)
+function badgeBoostScore(player, badgeCatalog) {
+  return matchedBadges(player, badgeCatalog).reduce((sum, b) => sum + badgeTierWeight(b.tier) * 5, 0)
 }
 
 // Computes what `attackRoster` should do against `defendRoster`: attack targets on defendRoster,
@@ -171,10 +176,10 @@ function computeScoutingReport(attackRoster, defendRoster, n = ROTATION_SIZE) {
       const interior = p.attributes.interiorDefense ?? 99
       // A weak raw rating can be misleading if the player is badged up — Clamps/Glove/Pick Dodger
       // etc. push the *effective* difficulty back up even though the number alone looks soft.
-      const perimBadges = matchedDefensiveBadges(p, PERIMETER_DEFENSE_BADGES)
-      const interiorBadges = matchedDefensiveBadges(p, PAINT_DEFENSE_BADGES)
-      const perimEffective = perim + defensiveBadgeScore(p, PERIMETER_DEFENSE_BADGES)
-      const interiorEffective = interior + defensiveBadgeScore(p, PAINT_DEFENSE_BADGES)
+      const perimBadges = matchedBadges(p, PERIMETER_DEFENSE_BADGES)
+      const interiorBadges = matchedBadges(p, PAINT_DEFENSE_BADGES)
+      const perimEffective = perim + badgeBoostScore(p, PERIMETER_DEFENSE_BADGES)
+      const interiorEffective = interior + badgeBoostScore(p, PAINT_DEFENSE_BADGES)
       const badges = dedupeByName([...perimBadges, ...interiorBadges])
       let attackHint
       if (isB) {
@@ -204,11 +209,11 @@ function computeScoutingReport(attackRoster, defendRoster, n = ROTATION_SIZE) {
     .filter(isPerimeterPlayer)
     .map(p => {
       const perim = p.attributes.perimeterDefense ?? 99
-      const badges = matchedDefensiveBadges(p, PERIMETER_DEFENSE_BADGES)
+      const badges = matchedBadges(p, PERIMETER_DEFENSE_BADGES)
       return {
         name: p.name, archetype: p.archetype, perim,
         badges,
-        effectiveRating: perim + defensiveBadgeScore(p, PERIMETER_DEFENSE_BADGES),
+        effectiveRating: perim + badgeBoostScore(p, PERIMETER_DEFENSE_BADGES),
       }
     })
     .sort((a, b) => a.effectiveRating - b.effectiveRating)
@@ -263,8 +268,8 @@ function computeBestDefenders(roster) {
     .filter(isPerimeterPlayer)
     .map(p => {
       const agility = ((p.attributes.speed ?? 0) + (p.attributes.agility ?? 0)) / 2
-      const badges = matchedDefensiveBadges(p, PERIMETER_DEFENSE_BADGES)
-      const badgeScore = defensiveBadgeScore(p, PERIMETER_DEFENSE_BADGES)
+      const badges = matchedBadges(p, PERIMETER_DEFENSE_BADGES)
+      const badgeScore = badgeBoostScore(p, PERIMETER_DEFENSE_BADGES)
       return {
         name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions,
         perim: p.attributes.perimeterDefense ?? 0, steal: p.attributes.steal ?? 0,
@@ -278,8 +283,8 @@ function computeBestDefenders(roster) {
   const paintDefenders = withAttrs
     .filter(isBigPlayer)
     .map(p => {
-      const badges = matchedDefensiveBadges(p, PAINT_DEFENSE_BADGES)
-      const badgeScore = defensiveBadgeScore(p, PAINT_DEFENSE_BADGES)
+      const badges = matchedBadges(p, PAINT_DEFENSE_BADGES)
+      const badgeScore = badgeBoostScore(p, PAINT_DEFENSE_BADGES)
       return {
         name: p.name, overall: p.overall, archetype: p.archetype, positions: p.positions,
         interior: p.attributes.interiorDefense ?? 0, block: p.attributes.block ?? 0, badges,
@@ -1391,6 +1396,7 @@ function TeamRankings({ teams, teamsLoading }) {
   const [rosterMap, setRosterMap] = useState(null)
   const [progress, setProgress] = useState({ done: 0, total: 0 })
   const [fetchStarted, setFetchStarted] = useState(false)
+  const [view, setView] = useState('teams')
 
   useEffect(() => {
     if (fetchStarted || teamsLoading || teams.length === 0) return
@@ -1472,10 +1478,67 @@ function TeamRankings({ teams, teamsLoading }) {
       }))
     : []
 
+  // Same five categories, but ranking individual players across every All-Time roster instead
+  // of team averages. Badges relevant to each category (see SPEED_BADGES etc.) boost a player's
+  // sort position — e.g. a Speed Boost/Quick First Step guard can out-rank a slightly faster
+  // player with no badges — but the number shown is still the raw attribute, not the boosted one.
+  const PLAYER_STAT_CATEGORIES = [
+    {
+      key: 'speed', label: 'Speed', badgeCatalog: SPEED_BADGES,
+      eligible: p => (p.positions || []).some(pos => PERIMETER.includes(pos)),
+      rawVal: p => p.attributes.speed ?? 0,
+    },
+    {
+      key: 'perimDef', label: 'Perimeter Defense', badgeCatalog: PERIMETER_DEFENSE_BADGES,
+      eligible: p => (p.positions || []).some(pos => PERIMETER.includes(pos)),
+      rawVal: p => p.attributes.perimeterDefense ?? 0,
+    },
+    {
+      key: 'intDef', label: 'Interior Defense', badgeCatalog: PAINT_DEFENSE_BADGES,
+      eligible: p => (p.positions || []).some(pos => BIGS.includes(pos)),
+      rawVal: p => p.attributes.interiorDefense ?? 0,
+    },
+    {
+      key: 'three', label: '3PT Shooting', badgeCatalog: THREE_POINT_BADGES,
+      eligible: p => (p.positions || []).some(pos => PERIMETER.includes(pos)),
+      rawVal: p => p.attributes.threePointShot ?? 0,
+    },
+    {
+      key: 'reb', label: 'Rebounding', badgeCatalog: REBOUNDING_BADGES,
+      eligible: () => true,
+      rawVal: p => Math.round(((p.attributes.offensiveRebound ?? 0) + (p.attributes.defensiveRebound ?? 0)) / 2),
+    },
+  ]
+
+  const allPlayers = rosterMap
+    ? Object.entries(rosterMap).flatMap(([teamName, roster]) =>
+        roster.filter(p => p.attributes).map(p => ({ ...p, team: teamName }))
+      )
+    : []
+
+  const playerRankings = rosterMap
+    ? PLAYER_STAT_CATEGORIES.map(cat => ({
+        key: cat.key,
+        label: cat.label,
+        rows: allPlayers
+          .filter(cat.eligible)
+          .map(p => {
+            const val = cat.rawVal(p)
+            return {
+              name: p.name, team: p.team, positions: p.positions, val,
+              score: val + badgeBoostScore(p, cat.badgeCatalog),
+            }
+          })
+          .filter(r => r.val > 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 10),
+      }))
+    : []
+
   return (
     <div className="team-rankings">
       <h2 className="rankings-title">Team Rankings</h2>
-      <p className="rankings-subtitle">All-Time teams ranked by key stats</p>
+      <p className="rankings-subtitle">All-Time teams and players ranked by key stats</p>
 
       {isLoading && (
         <div className="rankings-loading">
@@ -1485,38 +1548,87 @@ function TeamRankings({ teams, teamsLoading }) {
       )}
 
       {!isLoading && (
-        <div className="rankings-grid">
-          {rankings.map(cat => {
-            const max = cat.rows[0]?.val || 1
-            return (
-              <Card key={cat.key} className="gap-0">
-                <CardContent>
-                  <div className="mb-2 flex items-center justify-between border-b pb-2">
-                    <span className="font-mono text-[11px] font-bold tracking-widest text-muted-foreground uppercase">{cat.label}</span>
-                    <span className="font-mono text-[11px] font-bold tracking-widest text-muted-foreground uppercase">Avg ↓</span>
-                  </div>
-                  {cat.rows.map((t, i) => {
-                    const logo = teams.find(team => team.teamName === t.name)?.logo
-                    return (
-                      <div key={t.name} className="flex items-center gap-2.5 border-b py-2 last:border-b-0">
-                        <span className="w-5 shrink-0 text-right font-mono text-xs text-muted-foreground">{i + 1}</span>
-                        {logo
-                          ? <img className="size-6 shrink-0 object-contain" src={logo} alt="" onError={e => { e.target.style.visibility = 'hidden' }} />
-                          : <span className="size-6 shrink-0" />}
-                        <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{t.name.replace(/^All-Time /, '')}</span>
-                        <span className="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-muted sm:block">
-                          <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${Math.round((t.val / max) * 100)}%` }} />
-                        </span>
-                        <RatingChip value={t.val} />
+        <>
+          <Tabs value={view} onValueChange={setView} className="mb-4">
+            <TabsList>
+              <TabsTrigger value="teams">Teams</TabsTrigger>
+              <TabsTrigger value="players">Players</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {view === 'teams' && (
+            <div className="rankings-grid">
+              {rankings.map(cat => {
+                const max = cat.rows[0]?.val || 1
+                return (
+                  <Card key={cat.key} className="gap-0">
+                    <CardContent>
+                      <div className="mb-2 flex items-center justify-between border-b pb-2">
+                        <span className="font-mono text-[11px] font-bold tracking-widest text-muted-foreground uppercase">{cat.label}</span>
+                        <span className="font-mono text-[11px] font-bold tracking-widest text-muted-foreground uppercase">Avg ↓</span>
                       </div>
-                    )
-                  })}
-                  {cat.rows.length === 0 && <p className="no-data">No data</p>}
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
+                      {cat.rows.map((t, i) => {
+                        const logo = teams.find(team => team.teamName === t.name)?.logo
+                        return (
+                          <div key={t.name} className="flex items-center gap-2.5 border-b py-2 last:border-b-0">
+                            <span className="w-5 shrink-0 text-right font-mono text-xs text-muted-foreground">{i + 1}</span>
+                            {logo
+                              ? <img className="size-6 shrink-0 object-contain" src={logo} alt="" onError={e => { e.target.style.visibility = 'hidden' }} />
+                              : <span className="size-6 shrink-0" />}
+                            <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{t.name.replace(/^All-Time /, '')}</span>
+                            <span className="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-muted sm:block">
+                              <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${Math.round((t.val / max) * 100)}%` }} />
+                            </span>
+                            <RatingChip value={t.val} />
+                          </div>
+                        )
+                      })}
+                      {cat.rows.length === 0 && <p className="no-data">No data</p>}
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+
+          {view === 'players' && (
+            <div className="rankings-grid">
+              {playerRankings.map(cat => {
+                const max = cat.rows[0]?.val || 1
+                return (
+                  <Card key={cat.key} className="gap-0">
+                    <CardContent>
+                      <div className="mb-2 flex items-center justify-between border-b pb-2">
+                        <span className="font-mono text-[11px] font-bold tracking-widest text-muted-foreground uppercase">{cat.label}</span>
+                        <span className="font-mono text-[11px] font-bold tracking-widest text-muted-foreground uppercase">Top 10</span>
+                      </div>
+                      {cat.rows.map((p, i) => {
+                        const logo = teams.find(team => team.teamName === p.team)?.logo
+                        return (
+                          <div key={`${p.name}-${p.team}`} className="flex items-center gap-2.5 border-b py-2 last:border-b-0">
+                            <span className="w-5 shrink-0 text-right font-mono text-xs text-muted-foreground">{i + 1}</span>
+                            {logo
+                              ? <img className="size-6 shrink-0 object-contain" src={logo} alt="" onError={e => { e.target.style.visibility = 'hidden' }} />
+                              : <span className="size-6 shrink-0" />}
+                            <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+                              {p.name}
+                              <span className="ml-1.5 font-mono text-[10px] font-normal text-muted-foreground">{(p.positions || []).join('/')}</span>
+                            </span>
+                            <span className="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-muted sm:block">
+                              <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${Math.round((p.val / max) * 100)}%` }} />
+                            </span>
+                            <RatingChip value={p.val} />
+                          </div>
+                        )
+                      })}
+                      {cat.rows.length === 0 && <p className="no-data">No data</p>}
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   )
