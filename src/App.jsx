@@ -72,21 +72,25 @@ function getRatingColor(val) {
 
 // 2K card-tier chip colors (Galaxy Opal → Pink Diamond → Diamond → Amethyst → base),
 // matching the rating pills on the nba2kapi reference design.
+const ELITE_CHIP_STYLE = { background: '#1a1918', color: '#faf9f5' }
 function ratingChipStyle(val) {
   const n = parseInt(val, 10)
   if (isNaN(n)) return { background: '#e5e2da', color: '#57534a' }
-  if (n >= 95) return { background: '#1a1918', color: '#faf9f5' }
+  if (n >= 95) return ELITE_CHIP_STYLE
   if (n >= 90) return { background: '#b79ce0', color: '#1a1918' }
   if (n >= 85) return { background: '#d9bd7c', color: '#1a1918' }
   return { background: '#e5e2da', color: '#57534a' }
 }
 
-function RatingChip({ value, className }) {
+// `flat` skips the tiered coloring and always renders the elite/black style — used in lists
+// (like Player Rankings) that are already a top-10 leaderboard, where a different-colored chip
+// for e.g. a 92 next to a 98 reads as "worse", not as its own meaningful tier.
+function RatingChip({ value, className, flat = false }) {
   if (value == null || value === '—') return null
   return (
     <span
       className={cn('inline-flex min-w-8 items-center justify-center rounded-md px-1.5 py-0.5 font-mono text-xs font-bold', className)}
-      style={ratingChipStyle(value)}
+      style={flat ? ELITE_CHIP_STYLE : ratingChipStyle(value)}
     >
       {value}
     </span>
@@ -732,6 +736,11 @@ function PlayerCard({ player, teamName }) {
 function TeamPanel({ side, selectedTeam, onTeamChange, teams, roster, loading, error }) {
   const label = side === 'my' ? 'My Team' : "Opponent's Team"
   const teamLogo = teams.find(t => t.teamName === selectedTeam)?.logo
+  const [showBest, setShowBest] = useState(false)
+
+  const best3pt = bestByAttribute(roster, 'threePointShot')
+  const bestPerimDef = bestByAttribute(roster, 'perimeterDefense')
+  const bestIntDef = bestByAttribute(roster, 'interiorDefense')
 
   return (
     <div className={`team-panel team-panel--${side}`}>
@@ -756,6 +765,42 @@ function TeamPanel({ side, selectedTeam, onTeamChange, teams, roster, loading, e
 
       {loading && <RosterSkeleton />}
       {error && <div className="api-error">Error: {error}</div>}
+
+      {roster.length > 0 && (
+        <div className="border-b">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left font-mono text-xs font-bold tracking-widest text-muted-foreground uppercase"
+            onClick={() => setShowBest(s => !s)}
+            aria-expanded={showBest}
+          >
+            Best Players
+            <IconChevronDown className={cn('shrink-0 transition-transform', showBest && 'rotate-180')} />
+          </button>
+          {showBest && (
+            <div className="flex flex-col gap-2 px-4 pb-3">
+              {[
+                ['Best 3PT Shooter', best3pt, 'threePointShot'],
+                ['Best Perimeter Defender', bestPerimDef, 'perimeterDefense'],
+                ['Best Interior Defender', bestIntDef, 'interiorDefense'],
+              ].map(([lbl, p, attrKey]) => (
+                <div key={lbl}>
+                  <div className="mb-0.5 font-mono text-[10px] font-bold tracking-wide text-muted-foreground uppercase">{lbl}</div>
+                  {p
+                    ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="min-w-0 truncate text-[13px] font-medium">{p.name}</span>
+                        <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{(p.positions || []).join('/')}</span>
+                        <RatingChip value={p.attributes[attrKey]} className="ml-auto shrink-0" />
+                      </div>
+                    )
+                    : <span className="text-xs text-muted-foreground">No data</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {roster.length > 0 && (
         <div className="roster-list">
@@ -1406,7 +1451,6 @@ function TeamRankings({ teams, teamsLoading }) {
   const [progress, setProgress] = useState({ done: 0, total: 0 })
   const [fetchStarted, setFetchStarted] = useState(false)
   const [view, setView] = useState('teams')
-  const [expandedTeam, setExpandedTeam] = useState(null)
 
   useEffect(() => {
     if (fetchStarted || teamsLoading || teams.length === 0) return
@@ -1584,53 +1628,18 @@ function TeamRankings({ teams, teamsLoading }) {
                       {cat.rows.map((t, i) => {
                         const logo = teams.find(team => team.teamName === t.name)?.logo
                         const shortName = t.name.replace(/^All-Time /, '')
-                        const isOpen = expandedTeam === t.name
-                        const roster = rosterMap?.[t.name]
-                        const best3pt = isOpen ? bestByAttribute(roster, 'threePointShot') : null
-                        const bestPerimDef = isOpen ? bestByAttribute(roster, 'perimeterDefense') : null
-                        const bestIntDef = isOpen ? bestByAttribute(roster, 'interiorDefense') : null
                         return (
-                          <div key={t.name} className="border-b last:border-b-0">
-                            <button
-                              type="button"
-                              className="flex w-full items-center gap-2.5 py-2 text-left"
-                              onClick={() => setExpandedTeam(isOpen ? null : t.name)}
-                              aria-expanded={isOpen}
-                            >
-                              <span className="w-5 shrink-0 text-right font-mono text-xs text-muted-foreground">{i + 1}</span>
-                              <Avatar className="size-6 shrink-0 border-0">
-                                {logo && <AvatarImage src={logo} alt="" className="object-contain p-0.5" />}
-                                <AvatarFallback className="text-[9px]">{shortName[0]}</AvatarFallback>
-                              </Avatar>
-                              <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{shortName}</span>
-                              <span className="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-muted sm:block">
-                                <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${Math.round((t.val / max) * 100)}%` }} />
-                              </span>
-                              <RatingChip value={t.val} />
-                              <IconChevronDown className={cn('shrink-0 text-muted-foreground transition-transform', isOpen && 'rotate-180')} />
-                            </button>
-                            {isOpen && (
-                              <div className="mb-2 flex flex-col gap-2 rounded-lg bg-muted/60 p-2.5">
-                                {[
-                                  ['Best 3PT Shooter', best3pt, 'threePointShot'],
-                                  ['Best Perimeter Defender', bestPerimDef, 'perimeterDefense'],
-                                  ['Best Interior Defender', bestIntDef, 'interiorDefense'],
-                                ].map(([label, p, attrKey]) => (
-                                  <div key={label}>
-                                    <div className="mb-0.5 font-mono text-[10px] font-bold tracking-wide text-muted-foreground uppercase">{label}</div>
-                                    {p
-                                      ? (
-                                        <div className="flex items-center gap-1.5">
-                                          <span className="min-w-0 truncate text-[13px] font-medium">{p.name}</span>
-                                          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{(p.positions || []).join('/')}</span>
-                                          <RatingChip value={p.attributes[attrKey]} className="ml-auto shrink-0" />
-                                        </div>
-                                      )
-                                      : <span className="text-xs text-muted-foreground">No data</span>}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                          <div key={t.name} className="flex items-center gap-2.5 border-b py-2 last:border-b-0">
+                            <span className="w-5 shrink-0 text-right font-mono text-xs text-muted-foreground">{i + 1}</span>
+                            <Avatar className="size-6 shrink-0 border-0">
+                              {logo && <AvatarImage src={logo} alt="" className="object-contain p-0.5" />}
+                              <AvatarFallback className="text-[9px]">{shortName[0]}</AvatarFallback>
+                            </Avatar>
+                            <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{shortName}</span>
+                            <span className="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-muted sm:block">
+                              <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${Math.round((t.val / max) * 100)}%` }} />
+                            </span>
+                            <RatingChip value={t.val} />
                           </div>
                         )
                       })}
@@ -1670,7 +1679,7 @@ function TeamRankings({ teams, teamsLoading }) {
                             <span className="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-muted sm:block">
                               <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${Math.round((p.val / max) * 100)}%` }} />
                             </span>
-                            <RatingChip value={p.val} />
+                            <RatingChip value={p.val} flat />
                           </div>
                         )
                       })}
