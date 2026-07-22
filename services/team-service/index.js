@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import { metricsMiddleware } from './metrics.js'
 
 const PORT = process.env.PORT || 3001
 const UPSTREAM = 'https://api.nba2kapi.com'
@@ -8,6 +9,7 @@ const CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
 
 const app = express()
 app.use(cors())
+app.use(metricsMiddleware('team-service'))
 
 app.get('/healthz', (req, res) => {
   res.status(200).json({ status: 'ok' })

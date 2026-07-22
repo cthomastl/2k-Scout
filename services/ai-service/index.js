@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import Anthropic from '@anthropic-ai/sdk'
+import { metricsMiddleware } from './metrics.js'
 
 const PORT = process.env.PORT || 3002
 
@@ -8,6 +9,7 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 const app = express()
 app.use(cors())
+app.use(metricsMiddleware('ai-service'))
 app.use(express.json({ limit: '1mb' }))
 
 app.get('/healthz', (req, res) => {

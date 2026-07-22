@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import { createProxyMiddleware } from 'http-proxy-middleware'
+import { metricsMiddleware } from './metrics.js'
 
 const PORT = process.env.PORT || 8080
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://ai-service:3002'
@@ -9,6 +10,7 @@ const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://auth-service:30
 
 const app = express()
 app.use(cors())
+app.use(metricsMiddleware('gateway'))
 
 app.get('/healthz', (req, res) => {
   res.status(200).json({ status: 'ok' })

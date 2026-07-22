@@ -1,0 +1,7 @@
+{
+  "name": "2k-scout-discord-notifier",
+  "version": "1.0.0",
+  "description": "SNS-to-Discord bridge Lambda for CloudWatch alarm notifications",
+  "type": "module",
+  "main": "index.mjs"
+}

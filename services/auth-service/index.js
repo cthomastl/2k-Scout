@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import jwt from 'jsonwebtoken'
+import { metricsMiddleware } from './metrics.js'
 
 const PORT = process.env.PORT || 3003
 const DEMO_EMAIL = process.env.DEMO_EMAIL || 'scout@2kscout.app'
@@ -9,6 +10,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me'
 
 const app = express()
 app.use(cors())
+app.use(metricsMiddleware('auth-service'))
 app.use(express.json())
 
 app.get('/healthz', (req, res) => {

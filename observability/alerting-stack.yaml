@@ -1,0 +1,504 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  2K Scout observability stack: SNS alert topic, an SNS-to-Discord notifier Lambda,
+  CloudWatch Alarms on the golden signals (error rate, latency, saturation) for each
+  backend service plus the EC2 host, and a single summary dashboard. Deploy/update with
+  `aws cloudformation deploy`; tear the whole thing down (alarms included, so you stop
+  paying the per-alarm fee) with `aws cloudformation delete-stack`. See observability/README.md.
+
+Parameters:
+  DiscordWebhookUrl:
+    Type: String
+    NoEcho: true
+    Description: Discord channel webhook URL that alerts get posted to.
+  LambdaCodeS3Bucket:
+    Type: String
+    Description: S3 bucket containing the zipped discord-notifier Lambda code.
+  LambdaCodeS3Key:
+    Type: String
+    Default: discord-notifier.zip
+    Description: S3 key of the zipped discord-notifier Lambda code within LambdaCodeS3Bucket.
+  EC2InstanceId:
+    Type: String
+    Description: Instance ID of the EC2 box running the docker compose stack (for CPU/status-check alarms).
+  AlarmErrorRateThreshold:
+    Type: Number
+    Default: 5
+    Description: Percent of 5xx responses (of total requests) that triggers a HighErrorRate alarm.
+  AlarmLatencyThresholdMs:
+    Type: Number
+    Default: 1000
+    Description: p99 latency (ms) that triggers a HighLatency alarm.
+
+Resources:
+  AlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: 2k-scout-alerts
+      DisplayName: 2K Scout Alerts
+
+  DiscordNotifierRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: 2k-scout-discord-notifier-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  DiscordNotifierFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: 2k-scout-discord-notifier
+      Description: Forwards CloudWatch Alarm state changes (via SNS) to a Discord webhook.
+      Runtime: nodejs22.x
+      Handler: index.handler
+      Role: !GetAtt DiscordNotifierRole.Arn
+      Timeout: 10
+      MemorySize: 128
+      Code:
+        S3Bucket: !Ref LambdaCodeS3Bucket
+        S3Key: !Ref LambdaCodeS3Key
+      Environment:
+        Variables:
+          DISCORD_WEBHOOK_URL: !Ref DiscordWebhookUrl
+
+  DiscordNotifierInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref DiscordNotifierFunction
+      Action: lambda:InvokeFunction
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref AlertsTopic
+
+  DiscordNotifierSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AlertsTopic
+      Protocol: lambda
+      Endpoint: !GetAtt DiscordNotifierFunction.Arn
+
+  # ── Per-service golden-signal alarms ──
+  # notBreaching on missing data everywhere: a service with zero traffic (or an EC2 instance
+  # you've deliberately stopped to save cost — see docs/SRE.md) must never page just for being
+  # idle. All alarms report both into and out of ALARM (AlarmActions + OKActions) so recovery
+  # is announced too, not just the failure.
+
+  GatewayErrorRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: 2k-scout-gateway-error-rate
+      AlarmDescription: "Gateway 5xx rate above threshold. Runbook: docs/SRE.md#runbook-high-error-rate"
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: 3
+      DatapointsToAlarm: 2
+      Threshold: !Ref AlarmErrorRateThreshold
+      TreatMissingData: notBreaching
+      Metrics:
+        - Id: errors
+          ReturnData: false
+          MetricStat:
+            Period: 300
+            Stat: Sum
+            Metric:
+              Namespace: 2kScout
+              MetricName: ServerErrorCount
+              Dimensions:
+                - Name: Service
+                  Value: gateway
+        - Id: total
+          ReturnData: false
+          MetricStat:
+            Period: 300
+            Stat: Sum
+            Metric:
+              Namespace: 2kScout
+              MetricName: RequestCount
+              Dimensions:
+                - Name: Service
+                  Value: gateway
+        - Id: errorRate
+          ReturnData: true
+          Label: "Gateway Error Rate (%)"
+          Expression: "(errors / total) * 100"
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions: [!Ref AlertsTopic]
+
+  GatewayLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: 2k-scout-gateway-latency-p99
+      AlarmDescription: "Gateway p99 latency above threshold. Runbook: docs/SRE.md#runbook-high-latency"
+      Namespace: 2kScout
+      MetricName: Latency
+      Dimensions:
+        - Name: Service
+          Value: gateway
+      ExtendedStatistic: p99
+      Period: 300
+      EvaluationPeriods: 3
+      DatapointsToAlarm: 2
+      Threshold: !Ref AlarmLatencyThresholdMs
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions: [!Ref AlertsTopic]
+
+  TeamServiceErrorRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: 2k-scout-team-service-error-rate
+      AlarmDescription: "team-service 5xx rate above threshold (often means nba2kapi.com is down/rate-limiting). Runbook: docs/SRE.md#runbook-high-error-rate"
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: 3
+      DatapointsToAlarm: 2
+      Threshold: !Ref AlarmErrorRateThreshold
+      TreatMissingData: notBreaching
+      Metrics:
+        - Id: errors
+          ReturnData: false
+          MetricStat:
+            Period: 300
+            Stat: Sum
+            Metric:
+              Namespace: 2kScout
+              MetricName: ServerErrorCount
+              Dimensions:
+                - Name: Service
+                  Value: team-service
+        - Id: total
+          ReturnData: false
+          MetricStat:
+            Period: 300
+            Stat: Sum
+            Metric:
+              Namespace: 2kScout
+              MetricName: RequestCount
+              Dimensions:
+                - Name: Service
+                  Value: team-service
+        - Id: errorRate
+          ReturnData: true
+          Label: "team-service Error Rate (%)"
+          Expression: "(errors / total) * 100"
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions: [!Ref AlertsTopic]
+
+  TeamServiceLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: 2k-scout-team-service-latency-p99
+      AlarmDescription: "team-service p99 latency above threshold. Runbook: docs/SRE.md#runbook-high-latency"
+      Namespace: 2kScout
+      MetricName: Latency
+      Dimensions:
+        - Name: Service
+          Value: team-service
+      ExtendedStatistic: p99
+      Period: 300
+      EvaluationPeriods: 3
+      DatapointsToAlarm: 2
+      Threshold: !Ref AlarmLatencyThresholdMs
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions: [!Ref AlertsTopic]
+
+  AiServiceErrorRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: 2k-scout-ai-service-error-rate
+      AlarmDescription: "ai-service 5xx rate above threshold (often means the Anthropic API is down/rate-limiting). Runbook: docs/SRE.md#runbook-high-error-rate"
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: 3
+      DatapointsToAlarm: 2
+      Threshold: !Ref AlarmErrorRateThreshold
+      TreatMissingData: notBreaching
+      Metrics:
+        - Id: errors
+          ReturnData: false
+          MetricStat:
+            Period: 300
+            Stat: Sum
+            Metric:
+              Namespace: 2kScout
+              MetricName: ServerErrorCount
+              Dimensions:
+                - Name: Service
+                  Value: ai-service
+        - Id: total
+          ReturnData: false
+          MetricStat:
+            Period: 300
+            Stat: Sum
+            Metric:
+              Namespace: 2kScout
+              MetricName: RequestCount
+              Dimensions:
+                - Name: Service
+                  Value: ai-service
+        - Id: errorRate
+          ReturnData: true
+          Label: "ai-service Error Rate (%)"
+          Expression: "(errors / total) * 100"
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions: [!Ref AlertsTopic]
+
+  AiServiceLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: 2k-scout-ai-service-latency-p99
+      AlarmDescription: "ai-service p99 latency above threshold — Claude generation is naturally slower than other routes; tune AlarmLatencyThresholdMs if this is noisy. Runbook: docs/SRE.md#runbook-high-latency"
+      Namespace: 2kScout
+      MetricName: Latency
+      Dimensions:
+        - Name: Service
+          Value: ai-service
+      ExtendedStatistic: p99
+      Period: 300
+      EvaluationPeriods: 3
+      DatapointsToAlarm: 2
+      Threshold: !Ref AlarmLatencyThresholdMs
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions: [!Ref AlertsTopic]
+
+  AuthServiceErrorRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: 2k-scout-auth-service-error-rate
+      AlarmDescription: "auth-service 5xx rate above threshold. Runbook: docs/SRE.md#runbook-high-error-rate"
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: 3
+      DatapointsToAlarm: 2
+      Threshold: !Ref AlarmErrorRateThreshold
+      TreatMissingData: notBreaching
+      Metrics:
+        - Id: errors
+          ReturnData: false
+          MetricStat:
+            Period: 300
+            Stat: Sum
+            Metric:
+              Namespace: 2kScout
+              MetricName: ServerErrorCount
+              Dimensions:
+                - Name: Service
+                  Value: auth-service
+        - Id: total
+          ReturnData: false
+          MetricStat:
+            Period: 300
+            Stat: Sum
+            Metric:
+              Namespace: 2kScout
+              MetricName: RequestCount
+              Dimensions:
+                - Name: Service
+                  Value: auth-service
+        - Id: errorRate
+          ReturnData: true
+          Label: "auth-service Error Rate (%)"
+          Expression: "(errors / total) * 100"
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions: [!Ref AlertsTopic]
+
+  AuthServiceLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: 2k-scout-auth-service-latency-p99
+      AlarmDescription: "auth-service p99 latency above threshold. Runbook: docs/SRE.md#runbook-high-latency"
+      Namespace: 2kScout
+      MetricName: Latency
+      Dimensions:
+        - Name: Service
+          Value: auth-service
+      ExtendedStatistic: p99
+      Period: 300
+      EvaluationPeriods: 3
+      DatapointsToAlarm: 2
+      Threshold: !Ref AlarmLatencyThresholdMs
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions: [!Ref AlertsTopic]
+
+  # ── EC2 host saturation alarms ──
+
+  EC2HighCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: 2k-scout-ec2-cpu-high
+      AlarmDescription: "EC2 CPU above 80% for 10 minutes. Runbook: docs/SRE.md#runbook-high-saturation"
+      Namespace: AWS/EC2
+      MetricName: CPUUtilization
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref EC2InstanceId
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      DatapointsToAlarm: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions: [!Ref AlertsTopic]
+
+  EC2StatusCheckFailedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: 2k-scout-ec2-status-check-failed
+      AlarmDescription: "EC2 instance or system status check failed — likely a hard instance/host failure, not an app bug. Runbook: docs/SRE.md#runbook-instance-down"
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref EC2InstanceId
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      DatapointsToAlarm: 2
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      # notBreaching, not breaching-on-missing: a deliberately-stopped instance (see the
+      # cost-control note in docs/SRE.md) also stops reporting this metric — that must not
+      # look identical to a crashed one.
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions: [!Ref AlertsTopic]
+
+  EC2HighMemoryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: 2k-scout-ec2-memory-high
+      AlarmDescription: "EC2 memory above 85% for 10 minutes (requires the CloudWatch Agent — see observability/README.md). Runbook: docs/SRE.md#runbook-high-saturation"
+      Namespace: 2kScout/Host
+      MetricName: mem_used_percent
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref EC2InstanceId
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      DatapointsToAlarm: 2
+      Threshold: 85
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions: [!Ref AlertsTopic]
+
+  EC2HighDiskAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: 2k-scout-ec2-disk-high
+      AlarmDescription: "EC2 root disk above 85% used (requires the CloudWatch Agent — see observability/README.md). Runbook: docs/SRE.md#runbook-disk-full"
+      Namespace: 2kScout/Host
+      MetricName: disk_used_percent
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref EC2InstanceId
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      DatapointsToAlarm: 2
+      Threshold: 85
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertsTopic]
+      OKActions: [!Ref AlertsTopic]
+
+  # ── Single summary dashboard (stays within the free 3-dashboard tier) ──
+  SummaryDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: 2k-scout
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "text", "x": 0, "y": 0, "width": 24, "height": 1,
+              "properties": { "markdown": "## 2K Scout — Golden Signals" }
+            },
+            {
+              "type": "metric", "x": 0, "y": 1, "width": 12, "height": 6,
+              "properties": {
+                "title": "Request Count by Service",
+                "view": "timeSeries",
+                "stacked": false,
+                "period": 300,
+                "stat": "Sum",
+                "metrics": [
+                  [ "2kScout", "RequestCount", "Service", "gateway" ],
+                  [ "2kScout", "RequestCount", "Service", "team-service" ],
+                  [ "2kScout", "RequestCount", "Service", "ai-service" ],
+                  [ "2kScout", "RequestCount", "Service", "auth-service" ]
+                ]
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 1, "width": 12, "height": 6,
+              "properties": {
+                "title": "Error Rate by Service (%)",
+                "view": "timeSeries",
+                "period": 300,
+                "metrics": [
+                  [ { "expression": "(m1/m2)*100", "label": "gateway", "id": "e1" } ],
+                  [ "2kScout", "ServerErrorCount", "Service", "gateway", { "id": "m1", "visible": false, "stat": "Sum" } ],
+                  [ "2kScout", "RequestCount", "Service", "gateway", { "id": "m2", "visible": false, "stat": "Sum" } ],
+                  [ { "expression": "(m3/m4)*100", "label": "team-service", "id": "e2" } ],
+                  [ "2kScout", "ServerErrorCount", "Service", "team-service", { "id": "m3", "visible": false, "stat": "Sum" } ],
+                  [ "2kScout", "RequestCount", "Service", "team-service", { "id": "m4", "visible": false, "stat": "Sum" } ],
+                  [ { "expression": "(m5/m6)*100", "label": "ai-service", "id": "e3" } ],
+                  [ "2kScout", "ServerErrorCount", "Service", "ai-service", { "id": "m5", "visible": false, "stat": "Sum" } ],
+                  [ "2kScout", "RequestCount", "Service", "ai-service", { "id": "m6", "visible": false, "stat": "Sum" } ],
+                  [ { "expression": "(m7/m8)*100", "label": "auth-service", "id": "e4" } ],
+                  [ "2kScout", "ServerErrorCount", "Service", "auth-service", { "id": "m7", "visible": false, "stat": "Sum" } ],
+                  [ "2kScout", "RequestCount", "Service", "auth-service", { "id": "m8", "visible": false, "stat": "Sum" } ]
+                ]
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 7, "width": 12, "height": 6,
+              "properties": {
+                "title": "p99 Latency by Service (ms)",
+                "view": "timeSeries",
+                "period": 300,
+                "stat": "p99",
+                "metrics": [
+                  [ "2kScout", "Latency", "Service", "gateway" ],
+                  [ "2kScout", "Latency", "Service", "team-service" ],
+                  [ "2kScout", "Latency", "Service", "ai-service" ],
+                  [ "2kScout", "Latency", "Service", "auth-service" ]
+                ]
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 7, "width": 12, "height": 6,
+              "properties": {
+                "title": "EC2 Host Saturation",
+                "view": "timeSeries",
+                "period": 300,
+                "metrics": [
+                  [ "AWS/EC2", "CPUUtilization", "InstanceId", "${EC2InstanceId}", { "label": "CPU %", "stat": "Average" } ],
+                  [ "2kScout/Host", "mem_used_percent", "InstanceId", "${EC2InstanceId}", { "label": "Memory %", "stat": "Average" } ],
+                  [ "2kScout/Host", "disk_used_percent", "InstanceId", "${EC2InstanceId}", { "label": "Disk %", "stat": "Average" } ]
+                ]
+              }
+            }
+          ]
+        }
+
+Outputs:
+  AlertsTopicArn:
+    Value: !Ref AlertsTopic
+  DiscordNotifierFunctionArn:
+    Value: !GetAtt DiscordNotifierFunction.Arn
+  DashboardUrl:
+    Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=2k-scout"

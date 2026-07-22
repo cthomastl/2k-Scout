@@ -7,6 +7,14 @@ services:
       AI_SERVICE_URL: http://ai-service:3002
       TEAM_SERVICE_URL: http://team-service:3001
       AUTH_SERVICE_URL: http://auth-service:3003
+      AWS_EMF_ENVIRONMENT: Local
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-create-group: "true"
+        awslogs-group: /2k-scout/gateway
+        awslogs-stream: gateway
     depends_on:
       - ai-service
       - team-service
@@ -17,12 +25,28 @@ services:
     build: ./services/team-service
     environment:
       NBA2K_API_KEY: ${NBA2K_API_KEY}
+      AWS_EMF_ENVIRONMENT: Local
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-create-group: "true"
+        awslogs-group: /2k-scout/team-service
+        awslogs-stream: team-service
     restart: unless-stopped
 
   ai-service:
     build: ./services/ai-service
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      AWS_EMF_ENVIRONMENT: Local
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-create-group: "true"
+        awslogs-group: /2k-scout/ai-service
+        awslogs-stream: ai-service
     restart: unless-stopped
 
   auth-service:
@@ -31,4 +55,12 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       DEMO_EMAIL: ${DEMO_EMAIL:-scout@2kscout.app}
       DEMO_PASSWORD: ${DEMO_PASSWORD:-scout2k}
+      AWS_EMF_ENVIRONMENT: Local
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-create-group: "true"
+        awslogs-group: /2k-scout/auth-service
+        awslogs-stream: auth-service
     restart: unless-stopped

@@ -93,6 +93,11 @@ all origins.
 | gateway        | `AI_SERVICE_URL`   | `http://ai-service:3002` | ai-service base URL |
 | gateway        | `TEAM_SERVICE_URL` | `http://team-service:3001`| team-service base URL |
 | gateway        | `AUTH_SERVICE_URL` | `http://auth-service:3003`| auth-service base URL |
+| all four       | `AWS_EMF_ENVIRONMENT` | _(none — must be set to `Local`)_ | Forces `aws-embedded-metrics` to write metrics to stdout instead of trying to reach a CloudWatch Agent over TCP; see [`../observability/README.md`](../observability/README.md) |
+
+Every service also emits request metrics (`RequestCount`, `Latency`, `ServerErrorCount`,
+`ClientErrorCount`) via `metrics.js` — see [`../observability/README.md`](../observability/README.md)
+and [`../docs/SRE.md`](../docs/SRE.md) for the full observability/alerting setup these feed.
 
 ## Building images locally
 

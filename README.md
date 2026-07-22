@@ -194,3 +194,12 @@ Two things that trip people up here:
 1. **lint-build** — installs deps and runs `npm run build` to catch frontend errors.
 2. **build-and-push** — a matrix job that builds all five images and pushes them to
    `ghcr.io/<owner>/2k-scout-<service>` tagged with both `latest` and the commit SHA.
+
+## Observability & SRE
+
+Each backend service emits request/error/latency metrics (CloudWatch Embedded Metric
+Format) and ships logs to CloudWatch; alarms page a Discord channel on the golden signals
+(error rate, latency, saturation) for both the services and the EC2 host. See
+[`observability/README.md`](observability/README.md) for the CloudFormation stack and
+deploy steps, and [`docs/SRE.md`](docs/SRE.md) for the SLIs/SLOs/SLA these alarms are built
+around, plus incident runbooks.
