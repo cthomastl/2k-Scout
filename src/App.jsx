@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, Search, BarChart3, Settings as SettingsIcon, LogOut, Sun, Moon,
-  Users, Target, Zap, ArrowRight, History as HistoryIcon, Loader2,
+  Users, Target, Zap, ArrowRight, History as HistoryIcon, Loader2, ChevronDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardAction, CardContent, CardFooter } from '@/components/ui/card'
@@ -57,6 +57,7 @@ const IconUsers = p => <Users size={18} strokeWidth={1.7} {...p} />
 const IconTarget = p => <Target size={18} strokeWidth={1.7} {...p} />
 const IconBolt = p => <Zap size={18} strokeWidth={1.7} {...p} />
 const IconArrowRight = p => <ArrowRight size={18} strokeWidth={1.7} {...p} />
+const IconChevronDown = p => <ChevronDown size={14} strokeWidth={2} {...p} />
 const IconHistory = p => <HistoryIcon size={18} strokeWidth={1.7} {...p} />
 
 // Monochrome emphasis ramp (per the reference design): elite ratings read near-black,
@@ -108,6 +109,14 @@ function isPerimeterPlayer(p) { return (p.positions || []).some(pos => PERIMETER
 function isBigPlayer(p) { return (p.positions || []).some(pos => BIGS.includes(pos)) }
 function topByOverall(roster, n) {
   return [...roster].filter(p => p.attributes).sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0)).slice(0, n)
+}
+
+// Best player on a roster by a single attribute (e.g. threePointShot) — used for the
+// per-team "best 3PT / perimeter D / interior D" breakdown on Team Rankings.
+function bestByAttribute(roster, attrKey) {
+  const withAttr = (roster || []).filter(p => p.attributes && (p.attributes[attrKey] ?? 0) > 0)
+  if (!withAttr.length) return null
+  return withAttr.reduce((best, p) => (p.attributes[attrKey] > best.attributes[attrKey] ? p : best))
 }
 
 // Fills PG/SG/SF/PF/C from a pool ranked by scoreFn, one player per slot, no repeats.
@@ -1397,6 +1406,7 @@ function TeamRankings({ teams, teamsLoading }) {
   const [progress, setProgress] = useState({ done: 0, total: 0 })
   const [fetchStarted, setFetchStarted] = useState(false)
   const [view, setView] = useState('teams')
+  const [expandedTeam, setExpandedTeam] = useState(null)
 
   useEffect(() => {
     if (fetchStarted || teamsLoading || teams.length === 0) return
@@ -1516,23 +1526,27 @@ function TeamRankings({ teams, teamsLoading }) {
       )
     : []
 
+  // Real players (LeBron, MJ, etc.) can appear on more than one All-Time franchise roster —
+  // dedupe by name within each category and keep only their best-scoring entry, so the same
+  // person doesn't occupy two spots in a single top-10 list.
   const playerRankings = rosterMap
-    ? PLAYER_STAT_CATEGORIES.map(cat => ({
-        key: cat.key,
-        label: cat.label,
-        rows: allPlayers
-          .filter(cat.eligible)
-          .map(p => {
-            const val = cat.rawVal(p)
-            return {
-              name: p.name, team: p.team, positions: p.positions, val,
-              score: val + badgeBoostScore(p, cat.badgeCatalog),
-            }
-          })
-          .filter(r => r.val > 0)
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 10),
-      }))
+    ? PLAYER_STAT_CATEGORIES.map(cat => {
+        const bestByName = new Map()
+        for (const p of allPlayers.filter(cat.eligible)) {
+          const val = cat.rawVal(p)
+          if (val <= 0) continue
+          const score = val + badgeBoostScore(p, cat.badgeCatalog)
+          const existing = bestByName.get(p.name)
+          if (!existing || score > existing.score) {
+            bestByName.set(p.name, { name: p.name, team: p.team, positions: p.positions, val, score })
+          }
+        }
+        return {
+          key: cat.key,
+          label: cat.label,
+          rows: Array.from(bestByName.values()).sort((a, b) => b.score - a.score).slice(0, 10),
+        }
+      })
     : []
 
   return (
@@ -1569,17 +1583,54 @@ function TeamRankings({ teams, teamsLoading }) {
                       </div>
                       {cat.rows.map((t, i) => {
                         const logo = teams.find(team => team.teamName === t.name)?.logo
+                        const shortName = t.name.replace(/^All-Time /, '')
+                        const isOpen = expandedTeam === t.name
+                        const roster = rosterMap?.[t.name]
+                        const best3pt = isOpen ? bestByAttribute(roster, 'threePointShot') : null
+                        const bestPerimDef = isOpen ? bestByAttribute(roster, 'perimeterDefense') : null
+                        const bestIntDef = isOpen ? bestByAttribute(roster, 'interiorDefense') : null
                         return (
-                          <div key={t.name} className="flex items-center gap-2.5 border-b py-2 last:border-b-0">
-                            <span className="w-5 shrink-0 text-right font-mono text-xs text-muted-foreground">{i + 1}</span>
-                            {logo
-                              ? <img className="size-6 shrink-0 object-contain" src={logo} alt="" onError={e => { e.target.style.visibility = 'hidden' }} />
-                              : <span className="size-6 shrink-0" />}
-                            <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{t.name.replace(/^All-Time /, '')}</span>
-                            <span className="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-muted sm:block">
-                              <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${Math.round((t.val / max) * 100)}%` }} />
-                            </span>
-                            <RatingChip value={t.val} />
+                          <div key={t.name} className="border-b last:border-b-0">
+                            <button
+                              type="button"
+                              className="flex w-full items-center gap-2.5 py-2 text-left"
+                              onClick={() => setExpandedTeam(isOpen ? null : t.name)}
+                              aria-expanded={isOpen}
+                            >
+                              <span className="w-5 shrink-0 text-right font-mono text-xs text-muted-foreground">{i + 1}</span>
+                              <Avatar className="size-6 shrink-0 border-0">
+                                {logo && <AvatarImage src={logo} alt="" className="object-contain p-0.5" />}
+                                <AvatarFallback className="text-[9px]">{shortName[0]}</AvatarFallback>
+                              </Avatar>
+                              <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{shortName}</span>
+                              <span className="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-muted sm:block">
+                                <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${Math.round((t.val / max) * 100)}%` }} />
+                              </span>
+                              <RatingChip value={t.val} />
+                              <IconChevronDown className={cn('shrink-0 text-muted-foreground transition-transform', isOpen && 'rotate-180')} />
+                            </button>
+                            {isOpen && (
+                              <div className="mb-2 flex flex-col gap-2 rounded-lg bg-muted/60 p-2.5">
+                                {[
+                                  ['Best 3PT Shooter', best3pt, 'threePointShot'],
+                                  ['Best Perimeter Defender', bestPerimDef, 'perimeterDefense'],
+                                  ['Best Interior Defender', bestIntDef, 'interiorDefense'],
+                                ].map(([label, p, attrKey]) => (
+                                  <div key={label}>
+                                    <div className="mb-0.5 font-mono text-[10px] font-bold tracking-wide text-muted-foreground uppercase">{label}</div>
+                                    {p
+                                      ? (
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="min-w-0 truncate text-[13px] font-medium">{p.name}</span>
+                                          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{(p.positions || []).join('/')}</span>
+                                          <RatingChip value={p.attributes[attrKey]} className="ml-auto shrink-0" />
+                                        </div>
+                                      )
+                                      : <span className="text-xs text-muted-foreground">No data</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )
                       })}
@@ -1604,12 +1655,14 @@ function TeamRankings({ teams, teamsLoading }) {
                       </div>
                       {cat.rows.map((p, i) => {
                         const logo = teams.find(team => team.teamName === p.team)?.logo
+                        const teamShort = p.team.replace(/^All-Time /, '')
                         return (
                           <div key={`${p.name}-${p.team}`} className="flex items-center gap-2.5 border-b py-2 last:border-b-0">
                             <span className="w-5 shrink-0 text-right font-mono text-xs text-muted-foreground">{i + 1}</span>
-                            {logo
-                              ? <img className="size-6 shrink-0 object-contain" src={logo} alt="" onError={e => { e.target.style.visibility = 'hidden' }} />
-                              : <span className="size-6 shrink-0" />}
+                            <Avatar className="size-6 shrink-0 border-0">
+                              {logo && <AvatarImage src={logo} alt="" className="object-contain p-0.5" />}
+                              <AvatarFallback className="text-[9px]">{teamShort[0]}</AvatarFallback>
+                            </Avatar>
                             <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
                               {p.name}
                               <span className="ml-1.5 font-mono text-[10px] font-normal text-muted-foreground">{(p.positions || []).join('/')}</span>
