@@ -355,6 +355,6 @@ CloudWatch's cost splits into usage-based (metrics, log ingestion — stops auto
 nothing is running) and flat-fee (alarms, ~$0.10/alarm/month, billed for existing regardless
 of state). Stopping the EC2 instance handles the former automatically. To also stop the
 per-alarm fee during a long idle stretch, delete the whole stack in one command —
-`aws cloudformation delete-stack --stack-name 2k-scout-observability` — and redeploy later
+`aws cloudformation delete-stack --stack-name scout-observability` — and redeploy later
 from the same template. See [`observability/README.md`](../observability/README.md) for the
 full deploy/teardown commands.

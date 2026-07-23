@@ -89,7 +89,7 @@ aws s3 cp discord-notifier.zip s3://<a-bucket-you-own>/discord-notifier.zip
 ```bash
 aws cloudformation deploy \
   --template-file observability/alerting-stack.yaml \
-  --stack-name 2k-scout-observability \
+  --stack-name scout-observability \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameter-overrides \
     DiscordWebhookUrl='https://discord.com/api/webhooks/...' \
@@ -100,7 +100,9 @@ aws cloudformation deploy \
 
 `aws cloudformation deploy` is idempotent — re-run it after changing the template or any
 parameter (e.g. adjusting `AlarmErrorRateThreshold`) and it updates the existing stack in
-place.
+place. If you rename `--stack-name`, note CloudFormation stack names must start with a
+letter — `2k-scout-observability` fails validation for exactly that reason; `scout-observability`
+doesn't.
 
 **Verify**: trigger a test alarm state change —
 
@@ -125,7 +127,7 @@ This ties back to the "can I turn CloudWatch off when I'm not using it" question
   won't get paged just for being idle.
 - **To also stop the flat per-alarm fee**, tear down the whole stack in one command:
   ```bash
-  aws cloudformation delete-stack --stack-name 2k-scout-observability
+  aws cloudformation delete-stack --stack-name scout-observability
   ```
   Re-deploy later with the same `aws cloudformation deploy` command from step 6 — the
   dashboard and every alarm come back exactly as defined in the template.
